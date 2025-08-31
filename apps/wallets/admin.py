@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
+from django.utils.html import format_html
 from .models import Wallet, Transaction, DepositRequest
 
 @admin.register(Wallet)
@@ -8,8 +9,13 @@ class WalletAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ("wallet", "type", "amount_usd", "created_at")
+    list_display = ("wallet", "type", "amount_usd", "tx_id", "created_at")
     list_filter = ("type",)
+    search_fields = ("meta__tx_id",)
+
+    def tx_id(self, obj):
+        return (obj.meta or {}).get('tx_id')
+    tx_id.short_description = "Tx ID"
 
 @admin.register(DepositRequest)
 class DepositRequestAdmin(admin.ModelAdmin):
@@ -21,9 +27,8 @@ class DepositRequestAdmin(admin.ModelAdmin):
 
     def proof_preview(self, obj):
         if obj.proof_image and hasattr(obj.proof_image, 'url'):
-            return f'<a href="{obj.proof_image.url}" target="_blank"><img src="{obj.proof_image.url}" style="max-height:60px;"/></a>'
+            return format_html('<a href="{}" target="_blank"><img src="{}" style="max-height:60px;"/></a>', obj.proof_image.url, obj.proof_image.url)
         return ""
-    proof_preview.allow_tags = True
     proof_preview.short_description = "Proof"
 
     def approve_deposits(self, request, queryset):

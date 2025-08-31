@@ -26,6 +26,9 @@ class DepositRequest(models.Model):
     amount_usd = models.DecimalField(max_digits=14, decimal_places=2)
     fx_rate = models.DecimalField(max_digits=10, decimal_places=4)
     tx_id = models.CharField(max_length=100)
+    # New fields for bank/account info
+    bank_name = models.CharField(max_length=120, blank=True)
+    account_name = models.CharField(max_length=120, blank=True)
     proof_image = models.ImageField(upload_to='deposit_proofs/', null=True, blank=True)
     status = models.CharField(max_length=20, default='PENDING')  # PENDING/APPROVED/REJECTED/CREDITED
     created_at = models.DateTimeField(auto_now_add=True)

@@ -42,6 +42,8 @@ class MyDepositsView(generics.ListCreateAPIView):
             raise ValueError('amount_pkr is required')
         amount_pkr = Decimal(amount_pkr_raw)
         tx_id = self.request.data.get('tx_id')
+        bank_name = self.request.data.get('bank_name', '')
+        account_name = self.request.data.get('account_name', '')
         proof_image = self.request.FILES.get('proof_image')
         rate = get_fx_rate()
         amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
@@ -50,6 +52,8 @@ class MyDepositsView(generics.ListCreateAPIView):
             amount_usd=amount_usd,
             fx_rate=rate,
             tx_id=tx_id,
+            bank_name=bank_name,
+            account_name=account_name,
             proof_image=proof_image,
         )
 

@@ -16,7 +16,21 @@ class DepositRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = DepositRequest
-        fields = "__all__"
+        fields = [
+            "id",
+            "user",
+            "amount_pkr",
+            "amount_usd",
+            "fx_rate",
+            "tx_id",
+            "bank_name",
+            "account_name",
+            "proof_image",
+            "proof_image_url",
+            "status",
+            "created_at",
+            "processed_at",
+        ]
         read_only_fields = ["user", "amount_usd", "fx_rate", "status", "processed_at"]
 
     def get_proof_image_url(self, obj):

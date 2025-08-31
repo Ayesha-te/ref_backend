@@ -43,6 +43,8 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         # Default method/account_details if frontend omits them
         method = self.request.data.get('method') or 'BANK'
         account_details = self.request.data.get('account_details') or {}
+        bank_name = self.request.data.get('bank_name') or account_details.get('bank') or ''
+        account_name = self.request.data.get('account_name') or account_details.get('account_name') or ''
 
         serializer.save(
             user=self.request.user,
@@ -52,6 +54,8 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
             net_usd=net_usd,
             method=method,
             account_details=account_details,
+            bank_name=bank_name,
+            account_name=account_name,
         )
 
 @api_view(['GET'])

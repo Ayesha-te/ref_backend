@@ -13,6 +13,9 @@ class WithdrawalRequest(models.Model):
     amount_usd = models.DecimalField(max_digits=14, decimal_places=2)
     fx_rate = models.DecimalField(max_digits=10, decimal_places=4)
     method = models.CharField(max_length=20, choices=METHOD_CHOICES)
+    # New top-level bank/account fields
+    bank_name = models.CharField(max_length=120, blank=True)
+    account_name = models.CharField(max_length=120, blank=True)
     account_details = models.JSONField(default=dict)
     tx_id = models.CharField(max_length=100, null=True, blank=True)
     tax_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)

@@ -55,7 +55,7 @@ class ReferralPayoutAsRefereeInline(admin.TabularInline):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ("username", "email", "referral_code", "signup_tx_id", "referred_by", "referral_count", "is_approved", "is_staff", "wallet_available", "wallet_hold")
+    list_display = ("username", "email", "referral_code", "signup_tx_id", "signup_proof_thumb", "referred_by", "referral_count", "is_approved", "is_staff", "wallet_available", "wallet_hold")
     list_filter = ("is_approved", "is_staff")
     search_fields = ("username", "email", "referral_code")
     actions = ["approve_users", "reject_users"]
@@ -84,6 +84,13 @@ class UserAdmin(admin.ModelAdmin):
         latest = obj.signup_proofs.order_by('-created_at').first()
         return latest.tx_id if latest else "-"
     signup_tx_id.short_description = "Signup Tx ID"
+
+    def signup_proof_thumb(self, obj):
+        latest = obj.signup_proofs.order_by('-created_at').first()
+        if latest and latest.proof_image and hasattr(latest.proof_image, 'url'):
+            return format_html('<a href="{}" target="_blank"><img src="{}" style="max-height:40px;"/></a>', latest.proof_image.url, latest.proof_image.url)
+        return ""
+    signup_proof_thumb.short_description = "Signup Proof"
 
     def approve_users(self, request, queryset):
         updated = queryset.update(is_approved=True)

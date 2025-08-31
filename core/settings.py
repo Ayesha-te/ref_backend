@@ -79,7 +79,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Media files (uploads)
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+# Allow overriding media root via environment for platforms like Render where a persistent disk is mounted
+MEDIA_ROOT = Path(os.environ.get('DJANGO_MEDIA_ROOT', str(BASE_DIR / 'media')))
 
 # Enable compressed, cache-busted static files via WhiteNoise
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'

@@ -43,13 +43,15 @@ def request_approval(request):
 class MySignupProofsView(generics.ListCreateAPIView):
     serializer_class = SignupProofSerializer
     permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
     def get_queryset(self):
         return SignupProof.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        # DRF will read amount_pkr, tx_id, proof_image from request.data/FILES automatically
-        serializer.save(user=self.request.user)
+        # Mirror deposit flow: explicitly read file from request.FILES
+        proof_image = self.request.FILES.get('proof_image')
+        serializer.save(user=self.request.user, proof_image=proof_image)
 
 class SignupProofPublicCreateView(generics.CreateAPIView):
     """Allow unauthenticated users to submit signup proof by email."""

@@ -1,7 +1,7 @@
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.accounts.views import TokenObtainPairPatchedView
 
@@ -17,11 +17,13 @@ urlpatterns = [
     path('api/marketplace/', include('apps.marketplace.urls')),
 ]
 
-# Serve media and adminui in development
+# Serve media files (including in production)
+urlpatterns += [
+    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+]
+
+# Serve adminui only in development
 if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    from django.views.static import serve
-    from django.urls import re_path
     urlpatterns += [
         re_path(r'^adminui/?$', lambda request: serve(request, 'index.html', document_root=settings.BASE_DIR / 'adminui')),
         re_path(r'^adminui/(?P<path>.*)$', lambda request, path: serve(request, path, document_root=settings.BASE_DIR / 'adminui')),

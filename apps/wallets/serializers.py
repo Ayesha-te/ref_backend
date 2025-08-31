@@ -12,7 +12,18 @@ class TransactionSerializer(serializers.ModelSerializer):
         fields = ["id", "type", "amount_usd", "meta", "created_at"]
 
 class DepositRequestSerializer(serializers.ModelSerializer):
+    proof_image_url = serializers.SerializerMethodField(read_only=True)
+
     class Meta:
         model = DepositRequest
         fields = "__all__"
         read_only_fields = ["user", "amount_usd", "fx_rate", "status", "processed_at"]
+
+    def get_proof_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.proof_image and hasattr(obj.proof_image, 'url'):
+            url = obj.proof_image.url
+            if request is not None:
+                return request.build_absolute_uri(url)
+            return url
+        return None

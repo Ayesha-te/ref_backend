@@ -35,11 +35,28 @@ class MyDepositsView(generics.ListCreateAPIView):
         return DepositRequest.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        amount_pkr = Decimal(self.request.data.get('amount_pkr'))
+        amount_pkr_raw = self.request.data.get('amount_pkr')
+        if not amount_pkr_raw:
+            raise ValueError('amount_pkr is required')
+        amount_pkr = Decimal(amount_pkr_raw)
         tx_id = self.request.data.get('tx_id')
+        proof_image = self.request.FILES.get('proof_image')
         rate = get_fx_rate()
         amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
-        serializer.save(user=self.request.user, amount_usd=amount_usd, fx_rate=rate, tx_id=tx_id)
+        serializer.save(
+            user=self.request.user,
+            amount_usd=amount_usd,
+            fx_rate=rate,
+            tx_id=tx_id,
+            proof_image=proof_image,
+        )
+
+class AdminPendingDepositsView(generics.ListAPIView):
+    serializer_class = DepositRequestSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return DepositRequest.objects.filter(status='PENDING').order_by('-created_at')
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])

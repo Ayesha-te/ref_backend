@@ -14,6 +14,7 @@ class WithdrawalRequest(models.Model):
     fx_rate = models.DecimalField(max_digits=10, decimal_places=4)
     method = models.CharField(max_length=20, choices=METHOD_CHOICES)
     account_details = models.JSONField(default=dict)
+    tx_id = models.CharField(max_length=100, null=True, blank=True)
     tax_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     net_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     status = models.CharField(max_length=20, default='PENDING')  # PENDING/APPROVED/REJECTED/PAID

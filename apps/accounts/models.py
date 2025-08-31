@@ -12,3 +12,15 @@ class User(AbstractUser):
             import random, string
             self.referral_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         super().save(*args, **kwargs)
+
+class SignupProof(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='signup_proofs')
+    amount_pkr = models.DecimalField(max_digits=14, decimal_places=2)
+    tx_id = models.CharField(max_length=100)
+    proof_image = models.ImageField(upload_to='signup_proofs/', null=True, blank=True)
+    status = models.CharField(max_length=20, default='PENDING')  # PENDING/APPROVED/REJECTED
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']

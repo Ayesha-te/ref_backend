@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from .models import SignupProof
 
 User = get_user_model()
 
@@ -34,3 +35,20 @@ class SignupSerializer(serializers.ModelSerializer):
         user.is_approved = False
         user.save()
         return user
+
+class SignupProofSerializer(serializers.ModelSerializer):
+    proof_image_url = serializers.SerializerMethodField(read_only=True)
+
+    class Meta:
+        model = SignupProof
+        fields = """__all__"""
+        read_only_fields = ["user", "status", "processed_at"]
+
+    def get_proof_image_url(self, obj):
+        request = self.context.get('request')
+        if obj.proof_image and hasattr(obj.proof_image, 'url'):
+            url = obj.proof_image.url
+            if request is not None:
+                return request.build_absolute_uri(url)
+            return url
+        return None

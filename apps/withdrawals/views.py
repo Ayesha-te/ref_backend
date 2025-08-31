@@ -54,6 +54,13 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
             account_details=account_details,
         )
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def admin_pending_withdrawals(request):
+    qs = WithdrawalRequest.objects.filter(status='PENDING').order_by('-created_at')
+    data = WithdrawalRequestSerializer(qs, many=True, context={'request': request}).data
+    return Response(data)
+
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])
 def admin_withdraw_action(request, pk):
@@ -75,7 +82,7 @@ def admin_withdraw_action(request, pk):
     elif action == 'PAID':
         # final settle
         wallet = wr.user.wallet
-        Transaction.objects.create(wallet=wallet, type=Transaction.DEBIT, amount_usd=wr.net_usd, meta={'type': 'withdrawal', 'id': wr.id})
+        Transaction.objects.create(wallet=wallet, type=Transaction.DEBIT, amount_usd=wr.net_usd, meta={'type': 'withdrawal', 'id': wr.id, 'tx_id': wr.tx_id})
         wr.status = 'PAID'
         wr.processed_at = timezone.now()
         wr.save()

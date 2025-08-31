@@ -82,7 +82,11 @@ def admin_withdraw_action(request, pk):
     elif action == 'PAID':
         # final settle
         wallet = wr.user.wallet
-        Transaction.objects.create(wallet=wallet, type=Transaction.DEBIT, amount_usd=wr.net_usd, meta={'type': 'withdrawal', 'id': wr.id, 'tx_id': wr.tx_id})
+        # allow admin to attach/override tx_id in payout
+        tx_id = request.data.get('tx_id') or wr.tx_id
+        if request.data.get('tx_id') and not wr.tx_id:
+            wr.tx_id = tx_id
+        Transaction.objects.create(wallet=wallet, type=Transaction.DEBIT, amount_usd=wr.net_usd, meta={'type': 'withdrawal', 'id': wr.id, 'tx_id': tx_id})
         wr.status = 'PAID'
         wr.processed_at = timezone.now()
         wr.save()

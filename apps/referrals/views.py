@@ -14,9 +14,11 @@ class MyReferralsView(views.APIView):
         l2 = User.objects.filter(referred_by__referred_by=request.user).count()
         payouts = ReferralPayout.objects.filter(referrer=request.user)
         total_earnings = sum(p.amount_usd for p in payouts)
+        l3 = User.objects.filter(referred_by__referred_by__referred_by=request.user).count()
         return Response({
             'level1_count': l1,
             'level2_count': l2,
+            'level3_count': l3,
             'total_earnings_usd': total_earnings,
         })
 

@@ -6,9 +6,17 @@ from apps.wallets.models import Transaction
 
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
-    list_display = ("user", "amount_usd", "amount_pkr", "status", "created_at")
-    list_filter = ("status",)
+    list_display = ("user", "amount_usd", "amount_pkr", "method", "bank_name", "account_name", "account_number", "tx_id", "status", "created_at")
+    list_filter = ("status", "method")
+    search_fields = ("user__email", "user__username", "tx_id", "account_details__account_name", "account_details__account_number")
     actions = ["approve_withdrawals", "reject_withdrawals", "mark_paid_withdrawals"]
+
+    def bank_name(self, obj):
+        return (obj.account_details or {}).get('bank')
+    def account_name(self, obj):
+        return (obj.account_details or {}).get('account_name')
+    def account_number(self, obj):
+        return (obj.account_details or {}).get('account_number')
 
     def approve_withdrawals(self, request, queryset):
         updated = queryset.update(status='APPROVED', processed_at=timezone.now())
@@ -38,7 +46,7 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
                     wallet=wallet,
                     type=Transaction.DEBIT,
                     amount_usd=wr.net_usd,
-                    meta={'type': 'withdrawal', 'id': wr.id}
+                    meta={'type': 'withdrawal', 'id': wr.id, 'tx_id': wr.tx_id}
                 )
                 wr.status = 'PAID'
                 wr.processed_at = timezone.now()

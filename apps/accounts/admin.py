@@ -55,7 +55,7 @@ class ReferralPayoutAsRefereeInline(admin.TabularInline):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
-    list_display = ("username", "email", "referral_code", "referred_by", "referral_count", "is_approved", "is_staff", "wallet_available", "wallet_hold")
+    list_display = ("username", "email", "referral_code", "signup_tx_id", "referred_by", "referral_count", "is_approved", "is_staff", "wallet_available", "wallet_hold")
     list_filter = ("is_approved", "is_staff")
     search_fields = ("username", "email", "referral_code")
     actions = ["approve_users", "reject_users"]
@@ -78,6 +78,12 @@ class UserAdmin(admin.ModelAdmin):
         except Wallet.DoesNotExist:
             return 0
     wallet_hold.short_description = "Hold USD"
+
+    def signup_tx_id(self, obj):
+        # Show the most recent signup proof TX ID, if any
+        latest = obj.signup_proofs.order_by('-created_at').first()
+        return latest.tx_id if latest else "-"
+    signup_tx_id.short_description = "Signup Tx ID"
 
     def approve_users(self, request, queryset):
         updated = queryset.update(is_approved=True)

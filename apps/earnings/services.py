@@ -36,9 +36,9 @@ def compute_daily_earning_usd(day_index: int) -> dict:
     p = daily_percent_for_day(day_index)
     gross = PACKAGE_USD * p
     user_gross_share = gross * USER_SHARE
-    # Carve global pool from the platform portion to avoid exceeding gross
+    # Platform hold is 20% of gross (1 - USER_SHARE); global pool is tracked separately
     global_pool = gross * GLOBAL_POOL_CUT
-    platform_hold = gross * (Decimal('1') - USER_SHARE - GLOBAL_POOL_CUT)
+    platform_hold = gross * (Decimal('1') - USER_SHARE)
     return {
         'percent': p,
         'gross_usd': gross.quantize(Decimal('0.01')),

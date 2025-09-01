@@ -34,10 +34,8 @@ def on_user_approved(sender, instance: User, created, **kwargs):
             amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
 
             wallet, _ = Wallet.objects.get_or_create(user=instance)
-            wallet.available_usd = (Decimal(wallet.available_usd) + amount_usd).quantize(Decimal('0.01'))
-            wallet.save()
 
-            # Record transaction
+            # Record transaction only (do not credit to available balance)
             Transaction.objects.create(
                 wallet=wallet,
                 type=Transaction.CREDIT,
@@ -47,10 +45,11 @@ def on_user_approved(sender, instance: User, created, **kwargs):
                     'source': 'signup-initial',
                     'tx_id': 'SIGNUP-INIT',
                     'amount_pkr': str(amount_pkr),
+                    'non_income': True,
                 }
             )
 
-            # Create a credited deposit request record for admin traceability
+            # Record deposit for traceability without affecting balance
             DepositRequest.objects.create(
                 user=instance,
                 amount_pkr=amount_pkr,

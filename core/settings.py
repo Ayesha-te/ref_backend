@@ -106,7 +106,7 @@ AUTH_USER_MODEL = 'accounts.User'
 # Platform economics defaults
 ECONOMICS = {
     # Mode: UNCHANGED (90-day plan) or CYCLIC_130 (1%..3.5% then 4% for 100 days, repeat)
-    'PASSIVE_MODE': os.environ.get('PASSIVE_MODE', 'CYCLIC_130'),
+    'PASSIVE_MODE': os.environ.get('PASSIVE_MODE', 'UNCHANGED'),
     # Passive income (unchanged plan)
     'PASSIVE_SCHEDULE': [
         # (start_day, end_day, daily_percent)
@@ -129,8 +129,8 @@ ECONOMICS = {
     'USER_WALLET_SHARE': float(os.environ.get('USER_WALLET_SHARE', '0.80')),
     'WITHDRAW_TAX': float(os.environ.get('WITHDRAW_TAX', '0.10')),
     'GLOBAL_POOL_CUT': float(os.environ.get('GLOBAL_POOL_CUT', '0.10')), # optional applied before referral
-    # Referrals tiers (default lowered plan 6/3/1). Can be overridden via env: 0.10,0.05,0.02
-    'REFERRAL_TIERS': [float(x) for x in os.environ.get('REFERRAL_TIERS', '0.10,0.05,0.02').split(',')],
+    # Referrals tiers (default lowered plan 6/3/1). Can be overridden via env: 0.06,0.03,0.01
+    'REFERRAL_TIERS': [float(x) for x in os.environ.get('REFERRAL_TIERS', '0.06,0.03,0.01').split(',')],
     # USD->PKR
     'FX_SOURCE': 'ADMIN_RATE',
 }

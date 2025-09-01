@@ -82,13 +82,7 @@ def admin_deposit_action(request, pk):
         wallet.available_usd = (Decimal(wallet.available_usd) + dr.amount_usd).quantize(Decimal('0.01'))
         wallet.save()
         Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=dr.amount_usd, meta={'type': 'deposit', 'id': dr.id, 'tx_id': dr.tx_id})
-        # Trigger referral payout on first credited deposit if buyer was referred and no payout exists yet
-        try:
-            has_payout = ReferralPayout.objects.filter(referee=dr.user).exists()
-            if not has_payout and getattr(dr.user, 'referred_by', None):
-                pay_on_package_purchase(dr.user)
-        except Exception:
-            pass
+        # Do not trigger referral on deposits; referral is only on joining approval
         dr.status = 'CREDITED'
         dr.processed_at = timezone.now()
         dr.save()

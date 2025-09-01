@@ -12,7 +12,7 @@ PACKAGE_USD = Decimal('100.00')
 User = get_user_model()
 
 def pay_on_package_purchase(buyer: User):
-    """Distribute referral rewards up to 3 levels when buyer joins/buys $100 package."""
+    """Distribute referral rewards up to 3 levels when buyer joins (approval event), not on later deposits."""
     upline = []
     cur = buyer.referred_by
     level = 1
@@ -27,5 +27,5 @@ def pay_on_package_purchase(buyer: User):
         wallet, _ = Wallet.objects.get_or_create(user=ref_user)
         wallet.available_usd = (Decimal(wallet.available_usd) + amt).quantize(Decimal('0.01'))
         wallet.save()
-        Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id})
+        Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join'})
         ReferralPayout.objects.create(referrer=ref_user, referee=buyer, level=lvl, amount_usd=amt)

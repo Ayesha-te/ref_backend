@@ -6,7 +6,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
 from django.db import models
-from django.db.models import Sum, OuterRef, Subquery, CharField
+from django.db.models import Sum, OuterRef, Subquery, CharField, Count, Value, DecimalField
 from django.db.models.functions import Coalesce
 from .serializers import UserSerializer, SignupSerializer, SignupProofSerializer
 from .models import SignupProof
@@ -254,9 +254,10 @@ class AdminUsersListView(generics.GenericAPIView):
             users = users.filter(date_joined__date__lte=dj_to)
 
         users = users.annotate(
-            rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), 0),
+            rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
             bank_name=Subquery(latest_dr.values('bank_name')[:1], output_field=CharField()),
             account_name=Subquery(latest_dr.values('account_name')[:1], output_field=CharField()),
+            referrals_count=Count('referrals', distinct=True),  # direct referrals
         )
 
         allowed_orders = {
@@ -266,6 +267,7 @@ class AdminUsersListView(generics.GenericAPIView):
             'date_joined': 'date_joined', '-date_joined': '-date_joined',
             'last_login': 'last_login', '-last_login': '-last_login',
             'rewards_usd': 'rewards_usd', '-rewards_usd': '-rewards_usd',
+            'referrals_count': 'referrals_count', '-referrals_count': '-referrals_count',
         }
         users = users.order_by(allowed_orders.get(order_by, 'id'))
 
@@ -289,6 +291,7 @@ class AdminUsersListView(generics.GenericAPIView):
                 'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',
+                'referrals_count': getattr(u, 'referrals_count', 0) or 0,
             }
             for u in page_qs
         ]

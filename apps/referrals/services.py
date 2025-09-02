@@ -2,17 +2,62 @@ from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from apps.wallets.models import Wallet, Transaction
-from .models import ReferralPayout
-
-from django.conf import settings
+from .models import ReferralPayout, ReferralMilestoneProgress, ReferralMilestoneAward
 
 REFERRAL_TIERS = [Decimal(str(x)) for x in settings.ECONOMICS['REFERRAL_TIERS']]
 PACKAGE_USD = Decimal('100.00')
 
+# Milestone rewards by target direct-count
+MILESTONE_AMOUNTS = {
+    10: Decimal('5.00'),
+    30: Decimal('30.00'),
+    50: Decimal('60.00'),
+    100: Decimal('150.00'),
+}
+
 User = get_user_model()
 
+
+def _credit(wallet: Wallet, amount: Decimal, meta: dict):
+    wallet.available_usd = (Decimal(wallet.available_usd) + amount).quantize(Decimal('0.01'))
+    wallet.save()
+    Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amount, meta=meta)
+
+
+def _l1_gate_okay(user: User) -> bool:
+    """L1 referral only if referrer has >=10 current-cycle directs (no earnings before 10)."""
+    # Count direct referrals since last award boundary (we track with progress)
+    try:
+        prog = user.referral_milestone_progress
+    except ReferralMilestoneProgress.DoesNotExist:
+        return False
+    # L1 gate opens at 10 directs in current cycle
+    return prog.current_count >= 10 or prog.current_target() > 10
+
+
+def _process_milestones(referrer: User) -> None:
+    """Increment direct count and pay milestone if target hit; then advance stage and reset count."""
+    prog, _ = ReferralMilestoneProgress.objects.get_or_create(user=referrer)
+    prog.current_count += 1
+    # If hit target, pay award and advance
+    target = prog.current_target()
+    if prog.current_count >= target:
+        amt = MILESTONE_AMOUNTS.get(target, Decimal('0'))
+        if amt > 0:
+            wallet, _ = Wallet.objects.get_or_create(user=referrer)
+            _credit(wallet, amt, meta={'type': 'milestone', 'target': target})
+            ReferralMilestoneAward.objects.create(user=referrer, target=target, amount_usd=amt)
+        prog.advance_stage()
+    prog.save()
+
+
 def pay_on_package_purchase(buyer: User):
-    """Distribute referral rewards up to 3 levels when buyer joins (approval event), not on later deposits."""
+    """Distribute referral rewards when buyer is approved (joins). Rules:
+    - L1: 5% only if referrer has reached 10 directs in current cycle; 0% before 10.
+    - L2: 3% only if referrer has >=10 L2 users overall; otherwise 0%.
+    - L3: 2% only if referrer has >=10 L3 users overall; otherwise 0%.
+    - Also, when a direct referral joins, increment referrer milestone counter and pay [10:$5, 30:$30, 50:$60, 100:$150], then reset cycle stage.
+    """
     upline = []
     cur = buyer.referred_by
     level = 1
@@ -21,11 +66,32 @@ def pay_on_package_purchase(buyer: User):
         cur = cur.referred_by
         level += 1
 
+    # First handle milestone progression for L1 referrer only
+    if upline:
+        ref_user, lvl = upline[0]
+        if lvl == 1:
+            _process_milestones(ref_user)
+
+    # Now handle payouts with gates
     for ref_user, lvl in upline:
         pct = REFERRAL_TIERS[lvl-1]
+        # L1 gate: require 10 directs in current cycle
+        if lvl == 1 and not _l1_gate_okay(ref_user):
+            continue
+        # L2/L3 gate: require 10 members at that indirect level overall
+        if lvl == 2:
+            from django.contrib.auth import get_user_model
+            U = get_user_model()
+            l2_count = U.objects.filter(referred_by__referred_by=ref_user).count()
+            if l2_count < 10:
+                continue
+        if lvl == 3:
+            from django.contrib.auth import get_user_model
+            U = get_user_model()
+            l3_count = U.objects.filter(referred_by__referred_by__referred_by=ref_user).count()
+            if l3_count < 10:
+                continue
         amt = (PACKAGE_USD * pct).quantize(Decimal('0.01'))
         wallet, _ = Wallet.objects.get_or_create(user=ref_user)
-        wallet.available_usd = (Decimal(wallet.available_usd) + amt).quantize(Decimal('0.01'))
-        wallet.save()
-        Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join'})
+        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join'})
         ReferralPayout.objects.create(referrer=ref_user, referee=buyer, level=lvl, amount_usd=amt)

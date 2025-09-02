@@ -5,8 +5,13 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate, get_user_model
 from django.utils import timezone
+from django.db import models
+from django.db.models import Sum, OuterRef, Subquery, CharField
+from django.db.models.functions import Coalesce
 from .serializers import UserSerializer, SignupSerializer, SignupProofSerializer
 from .models import SignupProof
+from apps.earnings.models import PassiveEarning
+from apps.wallets.models import DepositRequest
 
 User = get_user_model()
 
@@ -139,3 +144,101 @@ def admin_reject_user(request, pk):
     user.is_active = False
     user.save()
     return Response({"status": "REJECTED"})
+
+class AdminUsersListView(generics.GenericAPIView):
+    """Admin endpoint returning users with rewards and bank details.
+    Supports search, filters, sorting, and pagination.
+    Query params: 
+      - q (icontains on username/email)
+      - is_approved (true/false)
+      - is_active (true/false)
+      - is_staff (true/false)
+      - date_joined_from (YYYY-MM-DD)
+      - date_joined_to (YYYY-MM-DD)
+      - order_by (username,email,date_joined,-date_joined,last_login,-last_login,rewards_usd,-rewards_usd)
+      - page, page_size
+    """
+    permission_classes = [permissions.IsAdminUser]
+
+    def _parse_bool(self, val):
+        if val is None: return None
+        s = str(val).lower()
+        if s in ['true','1','yes','y']: return True
+        if s in ['false','0','no','n']: return False
+        return None
+
+    def get(self, request, *args, **kwargs):
+        q = request.query_params.get('q')
+        is_approved = self._parse_bool(request.query_params.get('is_approved'))
+        is_active = self._parse_bool(request.query_params.get('is_active'))
+        is_staff = self._parse_bool(request.query_params.get('is_staff'))
+        dj_from = request.query_params.get('date_joined_from')
+        dj_to = request.query_params.get('date_joined_to')
+        order_by = request.query_params.get('order_by') or 'id'
+        page = max(int(request.query_params.get('page', 1) or 1), 1)
+        page_size = int(request.query_params.get('page_size', 20) or 20)
+        page_size = max(1, min(page_size, 200))  # clamp
+
+        # Latest deposit request per user for bank details
+        latest_dr = DepositRequest.objects.filter(user=OuterRef('pk')).order_by('-created_at')
+        users = User.objects.all()
+
+        if q:
+            users = users.filter(models.Q(username__icontains=q) | models.Q(email__icontains=q))
+        if is_approved is not None:
+            users = users.filter(is_approved=is_approved)
+        if is_active is not None:
+            users = users.filter(is_active=is_active)
+        if is_staff is not None:
+            users = users.filter(is_staff=is_staff)
+        if dj_from:
+            users = users.filter(date_joined__date__gte=dj_from)
+        if dj_to:
+            users = users.filter(date_joined__date__lte=dj_to)
+
+        users = users.annotate(
+            rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), 0),
+            bank_name=Subquery(latest_dr.values('bank_name')[:1], output_field=CharField()),
+            account_name=Subquery(latest_dr.values('account_name')[:1], output_field=CharField()),
+        )
+
+        allowed_orders = {
+            'id': 'id', '-id': '-id',
+            'username': 'username', '-username': '-username',
+            'email': 'email', '-email': '-email',
+            'date_joined': 'date_joined', '-date_joined': '-date_joined',
+            'last_login': 'last_login', '-last_login': '-last_login',
+            'rewards_usd': 'rewards_usd', '-rewards_usd': '-rewards_usd',
+        }
+        users = users.order_by(allowed_orders.get(order_by, 'id'))
+
+        total = users.count()
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_qs = users[start:end]
+
+        data = [
+            {
+                'id': u.id,
+                'username': u.username,
+                'first_name': u.first_name,
+                'last_name': u.last_name,
+                'email': u.email,
+                'is_active': u.is_active,
+                'is_staff': u.is_staff,
+                'is_approved': u.is_approved,
+                'date_joined': u.date_joined,
+                'last_login': u.last_login,
+                'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
+                'bank_name': getattr(u, 'bank_name', '') or '',
+                'account_name': getattr(u, 'account_name', '') or '',
+            }
+            for u in page_qs
+        ]
+
+        return Response({
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'results': data,
+        })

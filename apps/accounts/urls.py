@@ -10,6 +10,7 @@ from .views import (
     admin_pending_signup_proofs,
     admin_signup_proof_action,
     SignupProofPublicCreateView,
+    AdminUsersListView,
 )
 
 urlpatterns = [
@@ -28,4 +29,7 @@ urlpatterns = [
     path('admin/reject/<int:pk>/', admin_reject_user),
     path('admin/pending-signup-proofs/', admin_pending_signup_proofs),
     path('admin/signup-proof/action/<int:pk>/', admin_signup_proof_action),
+
+    # Admin users list with rewards and bank info
+    path('admin/users/', AdminUsersListView.as_view()),
 ]

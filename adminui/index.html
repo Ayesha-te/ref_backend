@@ -275,14 +275,16 @@
       <div class="section-head">
         <h3>Products</h3>
       </div>
-      <div class="row" style="gap:8px;margin-bottom:8px;">
-        <input id="newProductName" placeholder="Product name" />
+      <div class="row" style="gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:flex-start;">
+        <input id="newProductName" placeholder="Product name" style="min-width:200px;"/>
+        <input id="newProductPrice" type="number" step="0.01" placeholder="Price (USD)" style="width:140px;"/>
+        <input id="newProductDesc" placeholder="Description" style="min-width:280px;flex:1;"/>
         <button id="addProductBtn" class="btn">Add</button>
       </div>
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Title</th><th>Actions</th></tr>
+            <tr><th>Title</th><th>Price (USD)</th><th>Description</th><th>Active</th><th>Actions</th></tr>
           </thead>
           <tbody id="productsTbody"></tbody>
         </table>

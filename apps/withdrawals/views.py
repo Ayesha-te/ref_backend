@@ -1,9 +1,10 @@
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from django.conf import settings
 from django.utils import timezone
 from rest_framework import generics, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.exceptions import ValidationError
 from apps.wallets.models import Wallet, Transaction
 from .models import WithdrawalRequest
 from .serializers import WithdrawalRequestSerializer
@@ -22,16 +23,28 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         return WithdrawalRequest.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        # Validate amount_pkr
         amount_pkr_raw = self.request.data.get('amount_pkr')
-        if not amount_pkr_raw:
-            raise ValueError('amount_pkr is required')
-        amount_pkr = Decimal(amount_pkr_raw)
-        rate = get_fx_rate()
-        amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
+        if amount_pkr_raw in (None, ""):
+            raise ValidationError({"amount_pkr": ["This field is required."]})
+        try:
+            amount_pkr = Decimal(str(amount_pkr_raw))
+        except (InvalidOperation, TypeError):
+            raise ValidationError({"amount_pkr": ["Invalid decimal amount."]})
+        if amount_pkr <= 0:
+            raise ValidationError({"amount_pkr": ["Must be greater than 0."]})
 
+        # FX and USD conversion
+        rate = get_fx_rate()
+        try:
+            amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
+        except (InvalidOperation, ZeroDivisionError):
+            raise ValidationError({"detail": ["Invalid FX rate configuration."]})
+
+        # Wallet checks
         wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
         if amount_usd > wallet.available_usd:
-            raise ValueError('Insufficient balance')
+            raise ValidationError({"detail": ["Insufficient balance."]})
 
         tax = apply_withdraw_tax(amount_usd)
         net_usd = tax['net_usd']
@@ -43,6 +56,13 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         # Default method/account_details if frontend omits them
         method = self.request.data.get('method') or 'BANK'
         account_details = self.request.data.get('account_details') or {}
+        # Allow stringified JSON for account_details
+        if isinstance(account_details, str):
+            try:
+                import json
+                account_details = json.loads(account_details) or {}
+            except Exception:
+                account_details = {}
         bank_name = self.request.data.get('bank_name') or account_details.get('bank') or ''
         account_name = self.request.data.get('account_name') or account_details.get('account_name') or ''
 

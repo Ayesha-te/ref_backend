@@ -37,16 +37,28 @@ class MyDepositsView(generics.ListCreateAPIView):
         return DepositRequest.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError
+        from decimal import InvalidOperation
+
         amount_pkr_raw = self.request.data.get('amount_pkr')
-        if not amount_pkr_raw:
-            raise ValueError('amount_pkr is required')
-        amount_pkr = Decimal(amount_pkr_raw)
+        if amount_pkr_raw in (None, ""):
+            raise ValidationError({"amount_pkr": ["This field is required."]})
+        try:
+            amount_pkr = Decimal(str(amount_pkr_raw))
+        except (InvalidOperation, TypeError):
+            raise ValidationError({"amount_pkr": ["Invalid decimal amount."]})
+        if amount_pkr <= 0:
+            raise ValidationError({"amount_pkr": ["Must be greater than 0."]})
+
         tx_id = self.request.data.get('tx_id')
         bank_name = self.request.data.get('bank_name', '')
         account_name = self.request.data.get('account_name', '')
         proof_image = self.request.FILES.get('proof_image')
         rate = get_fx_rate()
-        amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
+        try:
+            amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
+        except (InvalidOperation, ZeroDivisionError):
+            raise ValidationError({"detail": ["Invalid FX rate configuration."]})
         serializer.save(
             user=self.request.user,
             amount_usd=amount_usd,

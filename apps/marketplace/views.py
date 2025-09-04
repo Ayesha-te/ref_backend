@@ -53,3 +53,31 @@ class MySalesStatsView(views.APIView):
             'total_revenue_usd': str(total_revenue),
             'orders_count': seller_orders.count(),
         })
+
+# Admin: list/add products (visible in frontend when is_active=True)
+class AdminProductsView(generics.ListCreateAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        return Product.objects.all().order_by('-created_at')
+
+    def perform_create(self, serializer):
+        # Admin-created product becomes globally visible (seller=admin)
+        serializer.save(seller=self.request.user, is_active=True)
+
+# Admin: toggle product active/hidden (frontend shows is_active=True)
+class AdminProductToggleActiveView(generics.UpdateAPIView):
+    serializer_class = ProductSerializer
+    permission_classes = [permissions.IsAdminUser]
+    queryset = Product.objects.all()
+
+    def patch(self, request, *args, **kwargs):
+        product = self.get_object()
+        active = request.data.get('is_active')
+        if active is None:
+            product.is_active = not product.is_active
+        else:
+            product.is_active = str(active).lower() in ['1','true','yes','y']
+        product.save()
+        return Response(ProductSerializer(product).data)

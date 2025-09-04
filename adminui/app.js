@@ -103,6 +103,9 @@
       if(id==='withdrawals'){ loadWithdrawals(); }
       if(id==='referrals'){ loadReferrals(); }
       if(id==='proofs'){ loadProofs(); }
+      if(id==='system'){ loadSystem(); }
+      if(id==='globalpool'){ loadGlobalPool(); }
+      if(id==='products'){ loadProducts(); }
     });
   });
 
@@ -357,6 +360,28 @@
     }catch(err){ console.error(err); toast('Action failed'); }
   });
 
+  // System overview
+  async function loadSystem(){
+    const wrap = $('#systemContent');
+    if(!wrap) return;
+    wrap.innerHTML = '<div class="muted">Loading...</div>';
+    try{
+      const data = await get(`${state.apiBase}/earnings/admin/system-overview/`);
+      wrap.innerHTML = `
+        <div class="cards">
+          <div class="card"><h3>Passive Mode</h3><div class="stat">${String(data.PASSIVE_MODE)}</div></div>
+          <div class="card"><h3>User Wallet Share</h3><div class="stat">${Number(data.USER_WALLET_SHARE*100).toFixed(0)}%</div></div>
+          <div class="card"><h3>Withdraw Tax</h3><div class="stat">${Number(data.WITHDRAW_TAX*100).toFixed(0)}%</div></div>
+          <div class="card"><h3>Global Pool Cut</h3><div class="stat">${Number(data.GLOBAL_POOL_CUT*100).toFixed(0)}%</div></div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <h3>Referral Tiers</h3>
+          <pre style="white-space:pre-wrap">${escapeHtml(JSON.stringify(data.REFERRAL_TIERS, null, 2))}</pre>
+        </div>
+      `;
+    }catch(e){ console.error(e); wrap.innerHTML = '<div class="muted">Failed to load</div>'; }
+  }
+
   // Referrals summary
   async function loadReferrals(){
     const wrap = $('#referralSummaryCards');
@@ -423,6 +448,67 @@
       .replaceAll('"','&quot;')
       .replaceAll("'",'&#39;');
   }
+
+  // Global Pool
+  async function loadGlobalPool(){
+    try{
+      const data = await get(`${state.apiBase}/earnings/admin/global-pool/`);
+      $('#globalPayoutDay').textContent = data.payout_day || 'Monday';
+      $('#globalPayoutAmount').textContent = data.last_payout?.amount_usd || '—';
+      const tbody = $('#globalPoolUsersTbody');
+      const rows = data.per_user_passive || [];
+      tbody.innerHTML = rows.length ? '' : '<tr><td colspan="2" class="muted">No data</td></tr>';
+      rows.forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${escapeHtml(r.username)}</td><td>${Number(r.total_passive_usd||0).toFixed(2)}</td>`;
+        tbody.appendChild(tr);
+      });
+    }catch(e){ console.error(e); toast('Failed to load global pool'); }
+  }
+
+  // Products (admin)
+  async function loadProducts(){
+    try{
+      const tbody = $('#productsTbody');
+      tbody.innerHTML = '<tr><td colspan="2" class="muted">Loading...</td></tr>';
+      const items = await get(`${state.apiBase}/marketplace/admin/products/`);
+      tbody.innerHTML = '';
+      if(!items.length){ tbody.innerHTML = '<tr><td colspan="2" class="muted">No products</td></tr>'; return; }
+      items.forEach(p=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(p.title)} ${p.is_active?'<span class="badge ok">ACTIVE</span>':'<span class="badge">HIDDEN</span>'}</td>
+          <td>
+            <button class="btn" data-action="toggle" data-id="${p.id}">${p.is_active?'Disable':'Enable'}</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }catch(e){ console.error(e); toast('Failed to load products'); }
+  }
+
+  $('#addProductBtn')?.addEventListener('click', async ()=>{
+    try{
+      const title = ($('#newProductName')?.value || '').trim();
+      if(!title){ toast('Enter product name'); return; }
+      await post(`${state.apiBase}/marketplace/admin/products/`, { title, description: '', price_usd: 0 });
+      toast('Product added');
+      $('#newProductName').value = '';
+      await loadProducts();
+    }catch(e){ console.error(e); toast('Add failed'); }
+  });
+
+  document.querySelector('#productsTbody')?.addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button'); if(!btn) return;
+    if(btn.dataset.action==='toggle'){
+      try{
+        await fetch(`${state.apiBase}/marketplace/admin/products/${btn.dataset.id}/toggle/`, {
+          method: 'PATCH', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify({})
+        });
+        await loadProducts();
+      }catch(err){ console.error(err); toast('Update failed'); }
+    }
+  });
 
   // Bind refresh buttons
   $('#refreshUsers').addEventListener('click', loadPendingUsers);

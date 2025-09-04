@@ -73,8 +73,8 @@
       <div class="filters">
         <input id="usersSearch" placeholder="Search username or email" />
         <select id="usersApproved">
+          <option value="true" selected>Approved</option>
           <option value="">All</option>
-          <option value="true">Approved</option>
           <option value="false">Not Approved</option>
         </select>
         <button id="applyUsersFilter" class="btn">Apply</button>
@@ -91,6 +91,7 @@
               <th data-sort="is_staff">Staff</th>
               <th data-sort="is_approved">Approved</th>
               <th data-sort="rewards_usd">Rewards (USD)</th>
+              <th data-sort="referrals_count">Referrals</th>
               <th>Bank</th>
               <th>Account</th>
               <th data-sort="date_joined">Joined</th>
@@ -103,8 +104,8 @@
         </table>
       </div>
       <div class="filters row">
-        <input id="usersSearch" placeholder="Search username or email" />
-        <select id="usersApproved">
+        <input id="usersSearch2" placeholder="Search username or email" />
+        <select id="usersApproved2">
           <option value="">Approved: All</option>
           <option value="true">Approved</option>
           <option value="false">Not Approved</option>
@@ -121,7 +122,7 @@
         </select>
         <input id="dateJoinedFrom" type="date" />
         <input id="dateJoinedTo" type="date" />
-        <button id="applyUsersFilter" class="btn">Apply</button>
+        <button id="applyUsersFilter2" class="btn">Apply</button>
       </div>
       <div class="pagination">
         <button id="usersPrev" class="btn">Prev</button>
@@ -136,6 +137,8 @@
             <tr>
               <th>User Name</th>
               <th>Email</th>
+              <th>Signup Tx ID</th>
+              <th>Signup Proof</th>
               <th>Submitted At</th>
               <th>Actions</th>
             </tr>
@@ -159,6 +162,10 @@
               <th>ID</th>
               <th>User</th>
               <th>Email</th>
+              <th>Tx ID</th>
+              <th>Bank</th>
+              <th>Account</th>
+              <th>Proof</th>
               <th>Amount (USD)</th>
               <th>Created</th>
               <th>Actions</th>
@@ -183,9 +190,10 @@
               <th>ID</th>
               <th>User</th>
               <th>Email</th>
-              <th>Amount (USD)</th>
+              <th>Tx ID</th>
               <th>Bank Name</th>
               <th>Account Name</th>
+              <th>Amount (USD)</th>
               <th>Created</th>
               <th>Actions</th>
             </tr>

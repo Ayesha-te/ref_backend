@@ -13,6 +13,7 @@ class TransactionSerializer(serializers.ModelSerializer):
 
 class DepositRequestSerializer(serializers.ModelSerializer):
     proof_image_url = serializers.SerializerMethodField(read_only=True)
+    user = serializers.SerializerMethodField(read_only=True)  # expose username/email to admin UI
 
     class Meta:
         model = DepositRequest
@@ -32,6 +33,10 @@ class DepositRequestSerializer(serializers.ModelSerializer):
             "processed_at",
         ]
         read_only_fields = ["user", "amount_usd", "fx_rate", "status", "processed_at"]
+
+    def get_user(self, obj):
+        u = obj.user
+        return {"id": u.id, "username": getattr(u, "username", ""), "email": getattr(u, "email", "")}
 
     def get_proof_image_url(self, obj):
         request = self.context.get('request')

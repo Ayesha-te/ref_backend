@@ -1,7 +1,12 @@
 (function(){
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
-  const state = { apiBase: '/api', access: null, refresh: null };
+  // Determine API base. Priority: localStorage -> ?apiBase= -> environment (localhost for dev) -> production URL
+  const defaultApiBase =
+    (typeof localStorage !== 'undefined' && localStorage.getItem('adminApiBase')) ||
+    new URLSearchParams(location.search).get('apiBase') ||
+    'https://ref-backend-8arb.onrender.com/api';
+  const state = { apiBase: defaultApiBase, access: null, refresh: null };
 
   const toast = (msg) => {
     const el = $('#toast');
@@ -57,11 +62,18 @@
   };
 
   async function login(username, password){
-    const data = await fetch(`${state.apiBase}/auth/token/`, {
+    const res = await fetch(`${state.apiBase}/auth/token/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
-    }).then(r=>{ if(!r.ok) throw new Error('Login failed'); return r.json(); });
+    });
+    if(!res.ok){
+      let detail = 'Login failed';
+      try { const data = await res.json(); detail = data?.detail || detail; } catch(_){ try{ detail = await res.text() || detail; }catch(__){}
+      }
+      throw new Error(`[${res.status}] ${detail}`);
+    }
+    const data = await res.json();
     state.access = data.access; state.refresh = data.refresh;
     toast('Logged in');
   }
@@ -81,9 +93,16 @@
   $$('.nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.section;
-      $$('#sectionTitle').textContent = btn.textContent;
+      $('#sectionTitle').textContent = btn.textContent; // fix: use single element selector
       $$('.section').forEach(s => s.classList.remove('active'));
       $('#'+id).classList.add('active');
+      // Auto-load when switching sections
+      if(id==='users'){ loadUsers(); }
+      if(id==='dashboard'){ loadDashboard(); }
+      if(id==='deposits'){ loadDeposits(); }
+      if(id==='withdrawals'){ loadWithdrawals(); }
+      if(id==='referrals'){ loadReferrals(); }
+      if(id==='proofs'){ loadProofs(); }
     });
   });
 
@@ -96,7 +115,7 @@
       await login(u,p);
       // On login, refresh all sections
       loadDashboard(); loadUsers(); loadPendingUsers(); loadDeposits(); loadWithdrawals(); loadReferrals(); loadProofs();
-    }catch(e){ console.error(e); toast('Login failed'); }
+    }catch(e){ console.error(e); toast(String(e?.message || e || 'Login failed')); }
   });
   $('#logoutBtn').addEventListener('click', ()=>{ logout(); });
 
@@ -121,7 +140,7 @@
   }
 
   // Users full list with search/filter/pagination
-  const usersState = { page: 1, pageSize: 20, q: '', isApproved: '', isActive: '', isStaff: '', djFrom: '', djTo: '', orderBy: 'id' };
+  const usersState = { page: 1, pageSize: 20, q: '', isApproved: 'true', isActive: '', isStaff: '', djFrom: '', djTo: '', orderBy: 'id' };
 
   async function loadUsers(){
     const tbody = $('#usersTbody');
@@ -155,6 +174,7 @@
             <td>${u.is_staff ? 'Yes' : 'No'}</td>
             <td>${u.is_approved ? 'Yes' : 'No'}</td>
             <td>${Number(u.rewards_usd||0).toFixed(2)}</td>
+            <td>${Number(u.referrals_count||0)}</td>
             <td>${escapeHtml(u.bank_name || '-')}</td>
             <td>${escapeHtml(u.account_name || '-')}</td>
             <td>${u.date_joined ? new Date(u.date_joined).toLocaleString() : '-'}</td>
@@ -185,16 +205,20 @@
     });
   });
 
-  $('#applyUsersFilter').addEventListener('click', ()=>{
-    usersState.q = $('#usersSearch').value.trim();
-    usersState.isApproved = $('#usersApproved').value;
-    usersState.isActive = $('#usersActive').value;
-    usersState.isStaff = $('#usersStaff').value;
-    usersState.djFrom = $('#dateJoinedFrom').value;
-    usersState.djTo = $('#dateJoinedTo').value;
+  function applyUsersFilterFrom(primary){
+    const qEl = primary ? $('#usersSearch') : $('#usersSearch2');
+    const apprEl = primary ? $('#usersApproved') : $('#usersApproved2');
+    usersState.q = (qEl?.value || '').trim();
+    usersState.isApproved = apprEl?.value ?? '';
+    usersState.isActive = $('#usersActive')?.value ?? '';
+    usersState.isStaff = $('#usersStaff')?.value ?? '';
+    usersState.djFrom = $('#dateJoinedFrom')?.value ?? '';
+    usersState.djTo = $('#dateJoinedTo')?.value ?? '';
     usersState.page = 1;
     loadUsers();
-  });
+  }
+  $('#applyUsersFilter').addEventListener('click', ()=>applyUsersFilterFrom(true));
+  $('#applyUsersFilter2').addEventListener('click', ()=>applyUsersFilterFrom(false));
   $('#usersPrev').addEventListener('click', ()=>{ if(usersState.page>1){ usersState.page--; loadUsers(); }});
   $('#usersNext').addEventListener('click', ()=>{ usersState.page++; loadUsers(); });
 
@@ -213,12 +237,15 @@
       tbody.innerHTML = '';
       rows.forEach(u=>{
         const tr = document.createElement('tr');
+        const proofLink = u.signup_proof_url ? `<a href="${u.signup_proof_url}" target="_blank">View</a>` : '-';
         tr.innerHTML = `
           <td>${escapeHtml(u.username || '-')}
             <div class="muted small">${escapeHtml(u.first_name || '')} ${escapeHtml(u.last_name || '')}</div>
           </td>
           <td>${escapeHtml(u.email || '-')}</td>
-          <td>${escapeHtml(u.created_at || '-')}</td>
+          <td>${escapeHtml(u.signup_tx_id || '-')}</td>
+          <td>${proofLink}</td>
+          <td>${u.submitted_at ? new Date(u.submitted_at).toLocaleString() : '-'}</td>
           <td>
             <button class="btn ok" data-action="approve" data-id="${u.id}">Approve</button>
             <button class="btn secondary" data-action="reject" data-id="${u.id}">Reject</button>
@@ -258,10 +285,15 @@
       tbody.innerHTML = '';
       rows.forEach(d=>{
         const tr = document.createElement('tr');
+        const proofUrl = d.proof_image_url || (d.proof_image ? `${location.origin}/media/${d.proof_image}` : null);
         tr.innerHTML = `
           <td>${d.id}</td>
           <td>${escapeHtml(d.user?.username || '-')}</td>
           <td>${escapeHtml(d.user?.email || '-')}</td>
+          <td>${escapeHtml(d.tx_id || '-')}</td>
+          <td>${escapeHtml(d.bank_name || '-')}</td>
+          <td>${escapeHtml(d.account_name || '-')}</td>
+          <td>${proofUrl ? `<a href="${proofUrl}" target="_blank">View</a>` : '-'}</td>
           <td>${Number(d.amount_usd||0).toFixed(2)}</td>
           <td>${escapeHtml(d.created_at || '-')}</td>
           <td>
@@ -299,9 +331,10 @@
           <td>${w.id}</td>
           <td>${escapeHtml(w.user?.username || '-')}</td>
           <td>${escapeHtml(w.user?.email || '-')}</td>
-          <td>${Number(w.amount_usd||0).toFixed(2)}</td>
+          <td>${escapeHtml(w.tx_id || '-')}</td>
           <td>${escapeHtml(w.bank_name || '-')}</td>
           <td>${escapeHtml(w.account_name || '-')}</td>
+          <td>${Number(w.amount_usd||0).toFixed(2)}</td>
           <td>${escapeHtml(w.created_at || '-')}</td>
           <td>
             <button class="btn ok" data-action="approve" data-id="${w.id}">Approve</button>

@@ -78,11 +78,39 @@ def admin_deposit_action(request, pk):
         dr.processed_at = timezone.now()
         dr.save()
     elif action == 'CREDIT':
+        # Apply economics: split deposit into user available share, platform hold, and global pool
+        from apps.earnings.models_global_pool import GlobalPool
+        from django.conf import settings as dj_settings
         wallet, _ = Wallet.objects.get_or_create(user=dr.user)
-        wallet.available_usd = (Decimal(wallet.available_usd) + dr.amount_usd).quantize(Decimal('0.01'))
+        user_share_rate = Decimal(str(dj_settings.ECONOMICS['USER_WALLET_SHARE']))
+        global_pool_rate = Decimal(str(dj_settings.ECONOMICS['GLOBAL_POOL_CUT']))
+        user_share = (dr.amount_usd * user_share_rate).quantize(Decimal('0.01'))
+        platform_hold = (dr.amount_usd - user_share).quantize(Decimal('0.01'))
+        global_pool = (dr.amount_usd * global_pool_rate).quantize(Decimal('0.01'))
+
+        wallet.available_usd = (Decimal(wallet.available_usd) + user_share).quantize(Decimal('0.01'))
+        wallet.hold_usd = (Decimal(wallet.hold_usd) + platform_hold).quantize(Decimal('0.01'))
         wallet.save()
-        Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=dr.amount_usd, meta={'type': 'deposit', 'id': dr.id, 'tx_id': dr.tx_id})
-        # Do not trigger referral on deposits; referral is only on joining approval
+
+        # Track pool balance
+        gp = GlobalPool.objects.first() or GlobalPool.objects.create()
+        gp.balance_usd = (Decimal(gp.balance_usd) + global_pool).quantize(Decimal('0.01'))
+        gp.save()
+
+        # Record full deposit in transactions with breakdown
+        Transaction.objects.create(
+            wallet=wallet,
+            type=Transaction.CREDIT,
+            amount_usd=dr.amount_usd,
+            meta={
+                'type': 'deposit',
+                'id': dr.id,
+                'tx_id': dr.tx_id,
+                'user_share_usd': str(user_share),
+                'platform_hold_usd': str(platform_hold),
+                'global_pool_usd': str(global_pool),
+            }
+        )
         dr.status = 'CREDITED'
         dr.processed_at = timezone.now()
         dr.save()

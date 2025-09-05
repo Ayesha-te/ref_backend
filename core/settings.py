@@ -137,3 +137,8 @@ ECONOMICS = {
 
 # Admin settable rate fallback
 ADMIN_USD_TO_PKR = float(os.environ.get('ADMIN_USD_TO_PKR', '280.0'))
+
+# Admin bank details for manual payments (shown at checkout)
+ADMIN_BANK_NAME = os.environ.get('ADMIN_BANK_NAME', '')
+ADMIN_ACCOUNT_NAME = os.environ.get('ADMIN_ACCOUNT_NAME', '')
+ADMIN_ACCOUNT_ID = os.environ.get('ADMIN_ACCOUNT_ID', '')

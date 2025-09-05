@@ -1,4 +1,5 @@
 from decimal import Decimal
+from django.conf import settings
 from django.db.models import Sum
 from rest_framework import generics, permissions, views
 from rest_framework.response import Response
@@ -7,7 +8,12 @@ from .serializers import ProductSerializer, OrderSerializer
 
 class ProductListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticated]
+
+    def get_permissions(self):
+        # Allow anyone to list products; creation requires auth
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
         return Product.objects.filter(is_active=True)
@@ -24,14 +30,19 @@ class MyProductsView(generics.ListAPIView):
 
 class OrderCreateView(generics.CreateAPIView):
     serializer_class = OrderSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def perform_create(self, serializer):
         product_id = self.request.data.get('product')
         quantity = int(self.request.data.get('quantity', 1))
         product = Product.objects.get(pk=product_id)
-        total = (Decimal(product.price_usd) * Decimal(quantity)).quantize(Decimal('0.01'))
-        serializer.save(buyer=self.request.user, total_usd=total, status='PAID')
+        unit_price = Decimal(product.price_usd)
+        # 10% discount if authenticated
+        if self.request.user and self.request.user.is_authenticated:
+            unit_price = (unit_price * Decimal('0.90')).quantize(Decimal('0.01'))
+        total = (unit_price * Decimal(quantity)).quantize(Decimal('0.01'))
+        buyer = self.request.user if (self.request.user and self.request.user.is_authenticated) else None
+        serializer.save(buyer=buyer, total_usd=total, status='PENDING')
 
 class MyOrdersView(generics.ListAPIView):
     serializer_class = OrderSerializer
@@ -52,6 +63,17 @@ class MySalesStatsView(views.APIView):
             'total_units_sold': int(total_units),
             'total_revenue_usd': str(total_revenue),
             'orders_count': seller_orders.count(),
+        })
+
+# Public endpoint to provide admin bank details for checkout
+class AdminBankInfoView(views.APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        return Response({
+            'bank_name': getattr(settings, 'ADMIN_BANK_NAME', ''),
+            'account_name': getattr(settings, 'ADMIN_ACCOUNT_NAME', ''),
+            'account_id': getattr(settings, 'ADMIN_ACCOUNT_ID', ''),
         })
 
 # Admin: list/add products (visible in frontend when is_active=True)
@@ -80,4 +102,4 @@ class AdminProductToggleActiveView(generics.UpdateAPIView):
         else:
             product.is_active = str(active).lower() in ['1','true','yes','y']
         product.save()
-        return Response(ProductSerializer(product).data)
+        return Response(ProductSerializer(product, context={'request': request}).data)

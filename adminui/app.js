@@ -15,7 +15,12 @@
     new URLSearchParams(location.search).get('apiBase') ||
     new URL('/api', location.origin).toString().replace(/\/$/, '');
   const defaultApiBase = normalizeApiBase(defaultApiBaseRaw);
-  const state = { apiBase: defaultApiBase, access: null, refresh: null };
+  // Initialize state with tokens from localStorage if available
+  const state = {
+    apiBase: defaultApiBase,
+    access: (typeof localStorage !== 'undefined' && localStorage.getItem('admin_access')) || null,
+    refresh: (typeof localStorage !== 'undefined' && localStorage.getItem('admin_refresh')) || null,
+  };
 
   const toast = (msg) => {
     const el = $('#toast');
@@ -141,6 +146,10 @@
     }
     const data = await res.json();
     state.access = data.access; state.refresh = data.refresh;
+    try {
+      localStorage.setItem('admin_access', state.access || '');
+      localStorage.setItem('admin_refresh', state.refresh || '');
+    } catch {}
     toast('Logged in');
   }
 
@@ -151,9 +160,18 @@
       body: JSON.stringify({ refresh: state.refresh })
     }).then(r=>{ if(!r.ok) throw new Error('Refresh failed'); return r.json(); });
     state.access = data.access;
+    if (data.refresh) { state.refresh = data.refresh; }
+    try {
+      localStorage.setItem('admin_access', state.access || '');
+      if (state.refresh) localStorage.setItem('admin_refresh', state.refresh);
+    } catch {}
   }
 
-  function logout(){ state.access = null; state.refresh = null; toast('Logged out'); }
+  function logout(){
+    state.access = null; state.refresh = null;
+    try { localStorage.removeItem('admin_access'); localStorage.removeItem('admin_refresh'); } catch {}
+    toast('Logged out');
+  }
 
   // Navigation
   $$('.nav-btn').forEach(btn=>{
@@ -317,6 +335,7 @@
           <td>${proofLink}</td>
           <td>${u.submitted_at ? new Date(u.submitted_at).toLocaleString() : '-'}</td>
           <td>
+            <button class="btn ok" data-action="approve" data-id="${u.id}">Approve</button>
             <button class="btn secondary" data-action="reject" data-id="${u.id}">Reject</button>
           </td>
         `;

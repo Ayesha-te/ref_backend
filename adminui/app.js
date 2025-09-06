@@ -172,6 +172,7 @@
       if(id==='system'){ if(state.access) loadSystem(); else setStatus('Login required'); }
       if(id==='globalpool'){ if(state.access) loadGlobalPool(); else setStatus('Login required'); }
       if(id==='products'){ if(state.access) loadProducts(); else setStatus('Login required'); }
+      if(id==='orders'){ if(state.access) loadOrders(); else setStatus('Login required'); }
     });
   });
 
@@ -316,7 +317,6 @@
           <td>${proofLink}</td>
           <td>${u.submitted_at ? new Date(u.submitted_at).toLocaleString() : '-'}</td>
           <td>
-            <button class="btn ok" data-action="approve" data-id="${u.id}">Approve</button>
             <button class="btn secondary" data-action="reject" data-id="${u.id}">Reject</button>
           </td>
         `;
@@ -413,6 +413,42 @@
     }catch(e){ console.error(e); tbody.innerHTML = '<tr><td colspan="5" class="muted">Failed to load</td></tr>'; }
   }
 
+  // Orders
+  async function loadOrders(){
+    const tbody = $('#ordersTbody');
+    if(!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="10" class="muted">Loading...</td></tr>';
+    try{
+      const statusSel = $('#ordersFilterStatus');
+      const statusVal = statusSel ? statusSel.value : '';
+      const url = statusVal ? `${state.apiBase}/marketplace/admin/orders/?status=${encodeURIComponent(statusVal)}` : `${state.apiBase}/marketplace/admin/orders/`;
+      const rows = await get(url);
+      if(!rows.length){ tbody.innerHTML = '<tr><td colspan="10" class="muted">No orders</td></tr>'; return; }
+      tbody.innerHTML = '';
+      rows.forEach(o=>{
+        const tr = document.createElement('tr');
+        const proofUrl = o.proof_image_url || (o.proof_image ? `${location.origin}/media/${o.proof_image}` : null);
+        tr.innerHTML = `
+          <td>${o.id}</td>
+          <td>${escapeHtml(o.product_title || '-')}</td>
+          <td>${escapeHtml(o.buyer_username || '-')}</td>
+          <td>${escapeHtml([o.guest_name, o.guest_email, o.guest_phone].filter(Boolean).join(' / ') || '-')}</td>
+          <td>${escapeHtml(o.tx_id || '-')}</td>
+          <td>${Number(o.total_usd||0).toFixed(2)}</td>
+          <td>${escapeHtml(o.status || '-')}</td>
+          <td>${proofUrl ? `<a href="${proofUrl}" target="_blank">View</a>` : '-'}</td>
+          <td>${o.created_at ? new Date(o.created_at).toLocaleString() : '-'}</td>
+          <td>
+            <select data-action="set-status" data-id="${o.id}">
+              ${['PENDING','PAID','CANCELLED'].map(s=>`<option value="${s}" ${o.status===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }catch(e){ console.error(e); tbody.innerHTML = '<tr><td colspan="10" class="muted">Failed to load</td></tr>'; }
+  }
+
   $('#addProductBtn')?.addEventListener('click', async (e)=>{
     e.preventDefault();
     e.stopPropagation();
@@ -459,6 +495,20 @@
     }catch(err){ console.error(err); toast('Toggle failed'); }
     finally{ btn.disabled = false; }
   });
+
+  // Orders handlers
+  document.querySelector('#ordersTbody')?.addEventListener('change', async (e)=>{
+    const sel = e.target.closest('select[data-action="set-status"]');
+    if(!sel) return;
+    const id = sel.dataset.id;
+    const status = sel.value;
+    try{
+      await patch(`${state.apiBase}/marketplace/admin/orders/${id}/status/`, { status });
+      toast('Order updated');
+    }catch(err){ console.error(err); toast('Update failed'); }
+  });
+  $('#refreshOrders')?.addEventListener('click', loadOrders);
+  $('#ordersFilterStatus')?.addEventListener('change', loadOrders);
 
   // Withdrawals
   async function loadWithdrawals(){

@@ -22,4 +22,5 @@ class Order(models.Model):
     guest_phone = models.CharField(max_length=50, blank=True, default='')
     guest_email = models.EmailField(blank=True, default='')
     tx_id = models.CharField(max_length=255, blank=True, default='')
+    proof_image = models.ImageField(upload_to='orders/', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

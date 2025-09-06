@@ -1,7 +1,8 @@
 from decimal import Decimal
 from django.conf import settings
 from django.db.models import Sum
-from rest_framework import generics, permissions, views
+from rest_framework import generics, permissions, views, status
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from .models import Product, Order
 from .serializers import ProductSerializer, OrderSerializer
@@ -31,6 +32,7 @@ class MyProductsView(generics.ListAPIView):
 class OrderCreateView(generics.CreateAPIView):
     serializer_class = OrderSerializer
     permission_classes = [permissions.AllowAny]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def perform_create(self, serializer):
         product_id = self.request.data.get('product')
@@ -103,3 +105,30 @@ class AdminProductToggleActiveView(generics.UpdateAPIView):
             product.is_active = str(active).lower() in ['1','true','yes','y']
         product.save()
         return Response(ProductSerializer(product, context={'request': request}).data)
+
+# Admin: list orders and update status
+class AdminOrdersView(generics.ListAPIView):
+    serializer_class = OrderSerializer
+    permission_classes = [permissions.IsAdminUser]
+
+    def get_queryset(self):
+        qs = Order.objects.select_related('product', 'buyer').order_by('-created_at')
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            qs = qs.filter(status=status_param.upper())
+        return qs
+
+class AdminOrderStatusView(views.APIView):
+    permission_classes = [permissions.IsAdminUser]
+
+    def patch(self, request, pk):
+        try:
+            order = Order.objects.get(pk=pk)
+        except Order.DoesNotExist:
+            return Response({'detail': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
+        new_status = str(request.data.get('status', '')).upper()
+        if new_status not in ['PENDING', 'PAID', 'CANCELLED']:
+            return Response({'detail': 'Invalid status'}, status=status.HTTP_400_BAD_REQUEST)
+        order.status = new_status
+        order.save()
+        return Response(OrderSerializer(order, context={'request': request}).data)

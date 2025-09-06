@@ -8,6 +8,8 @@ from .views import (
     AdminProductsView,
     AdminProductToggleActiveView,
     AdminBankInfoView,
+    AdminOrdersView,
+    AdminOrderStatusView,
 )
 
 urlpatterns = [
@@ -21,4 +23,8 @@ urlpatterns = [
     # Admin manage marketplace products (front-end visible when is_active=True)
     path('admin/products/', AdminProductsView.as_view()),
     path('admin/products/<int:pk>/toggle/', AdminProductToggleActiveView.as_view()),
+
+    # Admin orders management
+    path('admin/orders/', AdminOrdersView.as_view()),
+    path('admin/orders/<int:pk>/status/', AdminOrderStatusView.as_view()),
 ]

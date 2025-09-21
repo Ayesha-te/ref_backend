@@ -128,14 +128,7 @@ def admin_deposit_action(request, pk):
         dr.processed_at = timezone.now()
         dr.save()
 
-        # Trigger first investment referral on the first credited deposit (exclude signup-initial)
-        first_credited = not dr.user.deposit_requests.filter(status='CREDITED').exclude(id=dr.id).exists()
-        if first_credited and dr.tx_id != 'SIGNUP-INIT':
-            try:
-                pay_on_first_investment(dr.user, dr.amount_usd)
-            except Exception:
-                # Do not fail the credit action due to referral payout issues
-                pass
+        # Referral payouts on investment disabled; payouts handled on join approval (pay_on_package_purchase).
     else:
         return Response({'detail': 'Invalid action'}, status=400)
     return Response({'status': dr.status})

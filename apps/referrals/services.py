@@ -5,7 +5,8 @@ from apps.wallets.models import Wallet, Transaction
 from .models import ReferralPayout, ReferralMilestoneProgress, ReferralMilestoneAward
 
 REFERRAL_TIERS = [Decimal(str(x)) for x in settings.ECONOMICS['REFERRAL_TIERS']]
-PACKAGE_USD = Decimal('100.00')
+# Base amount considered as the "joining earning" for referral payouts
+PACKAGE_USD = Decimal('5.00')
 
 # Milestone rewards by target direct-count
 MILESTONE_AMOUNTS = {

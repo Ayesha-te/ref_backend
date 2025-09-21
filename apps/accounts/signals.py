@@ -20,6 +20,7 @@ def on_user_approved(sender, instance: User, created, **kwargs):
 
     if instance.is_approved and instance._state.adding is False:
         # 1) Referral payouts on "joining" (approval event)
+        # Still pay a fixed package-based referral at join (separate from investment-based earnings)
         pay_on_package_purchase(instance)
 
         # 2) Add $0.5 to global pool per joining

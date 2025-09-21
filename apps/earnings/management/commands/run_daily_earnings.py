@@ -1,19 +1,24 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from apps.wallets.models import Wallet, Transaction
+from apps.wallets.models import Wallet, Transaction, DepositRequest
 from apps.earnings.models import PassiveEarning
 from apps.earnings.services import compute_daily_earning_usd
 from apps.earnings.models_global_pool import GlobalPool
 from decimal import Decimal
 
 class Command(BaseCommand):
-    help = 'Compute daily passive earnings for all approved users'
+    help = 'Compute daily passive earnings for all approved users who have invested (first credited deposit).'
 
     def handle(self, *args, **options):
         User = get_user_model()
         users = User.objects.filter(is_approved=True)
         pool, _ = GlobalPool.objects.get_or_create(pk=1)
         for u in users:
+            # Only start passive earnings after first credited deposit (exclude signup initial)
+            has_invested = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').exists()
+            if not has_invested:
+                continue
+
             wallet, _ = Wallet.objects.get_or_create(user=u)
             # find next day index
             last = PassiveEarning.objects.filter(user=u).order_by('-day_index').first()

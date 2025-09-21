@@ -93,6 +93,7 @@ def admin_deposit_action(request, pk):
         # Apply economics: split deposit into user available share, platform hold, and global pool
         from apps.earnings.models_global_pool import GlobalPool
         from django.conf import settings as dj_settings
+        from apps.referrals.services import pay_on_first_investment
         wallet, _ = Wallet.objects.get_or_create(user=dr.user)
         user_share_rate = Decimal(str(dj_settings.ECONOMICS['USER_WALLET_SHARE']))
         global_pool_rate = Decimal(str(dj_settings.ECONOMICS['GLOBAL_POOL_CUT']))
@@ -126,6 +127,15 @@ def admin_deposit_action(request, pk):
         dr.status = 'CREDITED'
         dr.processed_at = timezone.now()
         dr.save()
+
+        # Trigger first investment referral on the first credited deposit (exclude signup-initial)
+        first_credited = not dr.user.deposit_requests.filter(status='CREDITED').exclude(id=dr.id).exists()
+        if first_credited and dr.tx_id != 'SIGNUP-INIT':
+            try:
+                pay_on_first_investment(dr.user, dr.amount_usd)
+            except Exception:
+                # Do not fail the credit action due to referral payout issues
+                pass
     else:
         return Response({'detail': 'Invalid action'}, status=400)
     return Response({'status': dr.status})

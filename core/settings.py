@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 from datetime import timedelta
+import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -61,12 +62,23 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Database: use Postgres via DATABASE_URL if provided, else fallback to local SQLite for dev
+_DB_URL = os.environ.get('DATABASE_URL')
+if _DB_URL:
+    DATABASES = {
+        'default': dj_database_url.parse(
+            _DB_URL,
+            conn_max_age=600,
+            ssl_require=True,  # Neon requires SSL
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = []
 

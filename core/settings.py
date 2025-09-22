@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'django_crontab',
 
     'apps.accounts.apps.AccountsConfig',
     'apps.wallets',
@@ -143,16 +144,25 @@ ECONOMICS = {
         (31, 130, 0.040) # 4% for next 100 days
     ],
     'USER_WALLET_SHARE': float(os.environ.get('USER_WALLET_SHARE', '0.80')),
-    'WITHDRAW_TAX': float(os.environ.get('WITHDRAW_TAX', '0.10')),
+    'WITHDRAW_TAX': float(os.environ.get('WITHDRAW_TAX', '0.20')),
     'GLOBAL_POOL_CUT': float(os.environ.get('GLOBAL_POOL_CUT', '0.10')), # optional applied before referral
     # Referral tiers default (after gates): L1=6%, L2=3%, L3=1%. Can be overridden via env: 0.06,0.03,0.01
     'REFERRAL_TIERS': [float(x) for x in os.environ.get('REFERRAL_TIERS', '0.06,0.03,0.01').split(',')],
+    # Milestone payout percents per target, e.g. "10:0.05,30:0.10" (optional)
+    'MILESTONE_PCTS': os.environ.get('MILESTONE_PCTS', ''),
     # USD->PKR
     'FX_SOURCE': 'ADMIN_RATE',
 }
 
 # Admin settable rate fallback
 ADMIN_USD_TO_PKR = float(os.environ.get('ADMIN_USD_TO_PKR', '280.0'))
+# Signup payment base in PKR
+SIGNUP_FEE_PKR = float(os.environ.get('SIGNUP_FEE_PKR', '1410'))
+
+# Weekly cron for global pool distribution (every Monday at 00:00 UTC)
+CRONJOBS = [
+    ('0 0 * * 1', 'django.core.management.call_command', ['distribute_global_pool']),
+]
 
 # Admin bank details for manual payments (shown at checkout)
 ADMIN_BANK_NAME = os.environ.get('ADMIN_BANK_NAME', '')

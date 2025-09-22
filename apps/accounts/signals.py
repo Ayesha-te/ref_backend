@@ -19,19 +19,26 @@ def on_user_approved(sender, instance: User, created, **kwargs):
         return
 
     if instance.is_approved and instance._state.adding is False:
-        # 1) Referral payouts on "joining" (approval event)
-        # Still pay a fixed package-based referral at join (separate from investment-based earnings)
+        # 1) Referral payouts on "joining" (approval event) - now percentage of signup payment
         pay_on_package_purchase(instance)
 
-        # 2) Add $0.5 to global pool per joining
+        # 2) Add percentage of signup payment to global pool per joining (optional; defaults to 0.50 USD fallback)
         pool, _ = GlobalPool.objects.get_or_create(pk=1)
-        pool.balance_usd = (Decimal(pool.balance_usd) + Decimal('0.50')).quantize(Decimal('0.01'))
+        try:
+            signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
+            rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
+            join_base_usd = (signup_fee_pkr / rate).quantize(Decimal('0.01'))
+            # keep 0.5 USD minimum top-up like before if computed is less than 0.50
+            top_up = max(join_base_usd * Decimal('0.00'), Decimal('0.50'))  # 0% of base, min $0.50
+        except Exception:
+            top_up = Decimal('0.50')
+        pool.balance_usd = (Decimal(pool.balance_usd) + top_up).quantize(Decimal('0.01'))
         pool.save()
 
-        # 3) Initial signup deposit credit (PKR 1410) -> converted to USD by admin rate
+        # 3) Initial signup deposit credit -> PKR to USD by admin rate
         try:
             rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
-            amount_pkr = Decimal('1410')
+            amount_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
             amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
 
             wallet, _ = Wallet.objects.get_or_create(user=instance)

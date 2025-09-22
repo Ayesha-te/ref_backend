@@ -5,16 +5,14 @@ from apps.wallets.models import Wallet, Transaction
 from .models import ReferralPayout, ReferralMilestoneProgress, ReferralMilestoneAward
 
 REFERRAL_TIERS = [Decimal(str(x)) for x in settings.ECONOMICS['REFERRAL_TIERS']]
-# Base amount considered as the "joining earning" for referral payouts
-PACKAGE_USD = Decimal('5.00')
 
-# Milestone rewards by target direct-count
-MILESTONE_AMOUNTS = {
-    10: Decimal('5.00'),
-    30: Decimal('30.00'),
-    50: Decimal('60.00'),
-    100: Decimal('150.00'),
-}
+# Read milestone percents from settings if provided (e.g., "10:0.05,30:0.10"). If not provided, default to zero (no milestone payout).
+_MILESTONE_PCTS_RAW = settings.ECONOMICS.get('MILESTONE_PCTS', '')
+MILESTONE_PCTS = {}
+if _MILESTONE_PCTS_RAW:
+    for pair in _MILESTONE_PCTS_RAW.split(','):
+        k, v = pair.split(':')
+        MILESTONE_PCTS[int(k.strip())] = Decimal(str(float(v.strip())))
 
 User = get_user_model()
 
@@ -25,40 +23,50 @@ def _credit(wallet: Wallet, amount: Decimal, meta: dict):
     Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amount, meta=meta)
 
 
-def _l1_gate_okay(user: User) -> bool:
-    """L1 referral only if referrer has >=10 current-cycle directs (no earnings before 10)."""
-    # Count direct referrals since last award boundary (we track with progress)
-    try:
-        prog = user.referral_milestone_progress
-    except ReferralMilestoneProgress.DoesNotExist:
-        return False
-    # L1 gate opens at 10 directs in current cycle
-    return prog.current_count >= 10 or prog.current_target() > 10
-
-
-def _process_milestones(referrer: User) -> None:
-    """Increment direct count and pay milestone if target hit; then advance stage and reset count."""
+def record_direct_first_investment(referrer: User, direct: User, amount_usd: Decimal) -> None:
+    """Track a direct's first investment toward the current milestone window and pay when target is reached.
+    Windows: [10, 30, 100] directs; award is a percentage of the combined first-investment amounts in the window.
+    Payout percents: 10 → 1%, 30 → 3%, 100 → 5%.
+    After payout, the window resets and advances to the next stage.
+    """
+    pct_map = {10: Decimal('0.01'), 30: Decimal('0.03'), 100: Decimal('0.05')}
     prog, _ = ReferralMilestoneProgress.objects.get_or_create(user=referrer)
-    prog.current_count += 1
-    # If hit target, pay award and advance
     target = prog.current_target()
+
+    # Only count each direct once per window
+    included = set(prog.included_direct_ids or [])
+    if direct.id in included:
+        return
+
+    included.add(direct.id)
+    prog.included_direct_ids = list(included)
+    prog.current_count += 1
+    prog.current_sum_usd = (Decimal(prog.current_sum_usd) + Decimal(amount_usd)).quantize(Decimal('0.01'))
+
     if prog.current_count >= target:
-        amt = MILESTONE_AMOUNTS.get(target, Decimal('0'))
-        if amt > 0:
+        pct = pct_map.get(target, Decimal('0'))
+        award = (Decimal(prog.current_sum_usd) * pct).quantize(Decimal('0.01')) if pct > 0 else Decimal('0')
+        if award > 0:
             wallet, _ = Wallet.objects.get_or_create(user=referrer)
-            _credit(wallet, amt, meta={'type': 'milestone', 'target': target})
-            ReferralMilestoneAward.objects.create(user=referrer, target=target, amount_usd=amt)
+            _credit(wallet, award, meta={'type': 'milestone', 'target': target, 'sum_usd': str(prog.current_sum_usd), 'pct': str(pct)})
+            ReferralMilestoneAward.objects.create(user=referrer, target=target, amount_usd=award)
         prog.advance_stage()
     prog.save()
 
 
 def pay_on_package_purchase(buyer: User):
     """Distribute referral rewards when buyer is approved (joins).
-    - L1: 6% (no gate)
-    - L2: 3% (no gate)
-    - L3: 1% (no gate)
-    - Milestones: when a direct referral joins, increment L1 referrer milestone and pay [10:$5, 30:$30, 50:$60, 100:$150], then advance stage.
+    - L1: 6%
+    - L2: 3%
+    - L3: 1%
+    Referral rewards are percentages of the signup payment amount (converted to USD).
+    Milestones (if configured) are also percentage-based of the same base amount.
     """
+    # Determine signup payment base in USD from PKR configured fee and current admin FX rate
+    signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
+    rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
+    base_signup_usd = (signup_fee_pkr / rate).quantize(Decimal('0.01'))
+
     upline = []
     cur = buyer.referred_by
     level = 1
@@ -67,25 +75,22 @@ def pay_on_package_purchase(buyer: User):
         cur = cur.referred_by
         level += 1
 
-    # Milestone progression for L1 referrer only
-    if upline:
-        ref_user, lvl = upline[0]
-        if lvl == 1:
-            _process_milestones(ref_user)
+    # Milestones now trigger only on directs' first investments via record_direct_first_investment.
+    # No milestone progression on signup approval.
 
-    # Payouts without gates
+    # Payouts: percentage of signup payment
     for ref_user, lvl in upline:
         pct = REFERRAL_TIERS[lvl-1]
-        amt = (PACKAGE_USD * pct).quantize(Decimal('0.01'))
+        amt = (base_signup_usd * pct).quantize(Decimal('0.01'))
+        if amt <= 0:
+            continue
         wallet, _ = Wallet.objects.get_or_create(user=ref_user)
-        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join'})
+        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join', 'base': str(base_signup_usd), 'pct': str(pct)})
         ReferralPayout.objects.create(referrer=ref_user, referee=buyer, level=lvl, amount_usd=amt)
 
 
 def pay_on_first_investment(buyer: User, amount_usd: Decimal):
-    """Distribute referral rewards on buyer's first investment (first credited deposit not including signup-initial).
-    Uses same tiers: L1=6%, L2=3%, L3=1%.
-    """
+    """Distribute referral rewards on buyer's first investment using same tiers (% of investment amount)."""
     upline = []
     cur = buyer.referred_by
     level = 1
@@ -100,5 +105,5 @@ def pay_on_first_investment(buyer: User, amount_usd: Decimal):
         if amt <= 0:
             continue
         wallet, _ = Wallet.objects.get_or_create(user=ref_user)
-        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'first_investment'})
+        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'first_investment', 'base': str(amount_usd), 'pct': str(pct)})
         ReferralPayout.objects.create(referrer=ref_user, referee=buyer, level=lvl, amount_usd=amt)

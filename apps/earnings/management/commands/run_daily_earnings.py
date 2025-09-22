@@ -4,6 +4,7 @@ from apps.wallets.models import Wallet, Transaction, DepositRequest
 from apps.earnings.models import PassiveEarning
 from apps.earnings.services import compute_daily_earning_usd
 from apps.earnings.models_global_pool import GlobalPool
+from apps.referrals.services import record_direct_first_investment
 from decimal import Decimal
 
 class Command(BaseCommand):
@@ -15,11 +16,18 @@ class Command(BaseCommand):
         pool, _ = GlobalPool.objects.get_or_create(pk=1)
         for u in users:
             # Only start passive earnings after first credited deposit (exclude signup initial)
-            has_invested = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').exists()
-            if not has_invested:
+            # Detect first credited investment (excluding signup init); if present and not yet recorded to referrer milestone, record it once.
+            first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').order_by('processed_at', 'created_at').first()
+            if not first_dep:
                 continue
-
+            # Link to referrer milestone once per user: use a transaction meta flag to ensure idempotence.
             wallet, _ = Wallet.objects.get_or_create(user=u)
+            flag_key = f"first_investment_recorded:{u.id}"
+            already = wallet.transactions.filter(meta__flag=flag_key).exists()
+            if not already and u.referred_by:
+                record_direct_first_investment(u.referred_by, u, first_dep.amount_usd)
+                Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=Decimal('0.00'), meta={'type': 'meta', 'flag': flag_key})
+
             # find next day index
             last = PassiveEarning.objects.filter(user=u).order_by('-day_index').first()
             next_day = (last.day_index + 1) if last else 1

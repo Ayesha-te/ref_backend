@@ -90,22 +90,25 @@ def admin_deposit_action(request, pk):
         dr.processed_at = timezone.now()
         dr.save()
     elif action == 'CREDIT':
-        # Apply economics: split deposit into user available share, platform hold, and global pool
+        # Apply economics: split deposit into user available share, platform hold, and fixed global pool contribution
         from apps.earnings.models_global_pool import GlobalPool
         from django.conf import settings as dj_settings
         from apps.referrals.services import pay_on_first_investment
         wallet, _ = Wallet.objects.get_or_create(user=dr.user)
         user_share_rate = Decimal(str(dj_settings.ECONOMICS['USER_WALLET_SHARE']))
-        global_pool_rate = Decimal(str(dj_settings.ECONOMICS['GLOBAL_POOL_CUT']))
+        
+        # Fixed $0.50 USD contribution to global pool per approval
+        fixed_global_pool_contribution = Decimal('0.50')
+        
         user_share = (dr.amount_usd * user_share_rate).quantize(Decimal('0.01'))
-        platform_hold = (dr.amount_usd - user_share).quantize(Decimal('0.01'))
-        global_pool = (dr.amount_usd * global_pool_rate).quantize(Decimal('0.01'))
+        platform_hold = (dr.amount_usd - user_share - fixed_global_pool_contribution).quantize(Decimal('0.01'))
+        global_pool = fixed_global_pool_contribution
 
         wallet.available_usd = (Decimal(wallet.available_usd) + user_share).quantize(Decimal('0.01'))
         wallet.hold_usd = (Decimal(wallet.hold_usd) + platform_hold).quantize(Decimal('0.01'))
         wallet.save()
 
-        # Track pool balance
+        # Track pool balance - add fixed $0.50 USD
         gp = GlobalPool.objects.first() or GlobalPool.objects.create()
         gp.balance_usd = (Decimal(gp.balance_usd) + global_pool).quantize(Decimal('0.01'))
         gp.save()
@@ -122,6 +125,7 @@ def admin_deposit_action(request, pk):
                 'user_share_usd': str(user_share),
                 'platform_hold_usd': str(platform_hold),
                 'global_pool_usd': str(global_pool),
+                'global_pool_fixed': True,  # Indicates fixed $0.50 contribution
             }
         )
         dr.status = 'CREDITED'

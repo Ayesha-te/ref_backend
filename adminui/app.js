@@ -189,6 +189,7 @@
       if(id==='proofs'){ if(state.access) loadProofs(); else setStatus('Login required'); }
       if(id==='system'){ if(state.access) loadSystem(); else setStatus('Login required'); }
       if(id==='globalpool'){ if(state.access) loadGlobalPool(); else setStatus('Login required'); }
+      if(id==='systemoverview'){ if(state.access) loadSystemOverview(); else setStatus('Login required'); }
       if(id==='products'){ if(state.access) loadProducts(); else setStatus('Login required'); }
       if(id==='orders'){ if(state.access) loadOrders(); else setStatus('Login required'); }
     });
@@ -202,7 +203,7 @@
       if(!u||!p){ toast('Enter username and password'); return; }
       await login(u,p);
       // On login, refresh all sections
-      loadDashboard(); loadUsers(); loadPendingUsers(); loadDeposits(); loadWithdrawals(); loadReferrals(); loadProofs(); loadProducts();
+      loadDashboard(); loadUsers(); loadPendingUsers(); loadDeposits(); loadWithdrawals(); loadReferrals(); loadProofs(); loadProducts(); loadGlobalPool(); loadSystemOverview();
     }catch(e){ console.error(e); toast(String(e?.message || e || 'Login failed')); }
   });
   $('#logoutBtn').addEventListener('click', ()=>{ logout(); });
@@ -404,6 +405,7 @@
         toast('Deposit updated');
         await loadDeposits();
         await loadDashboard();
+        await loadGlobalPool(); // Reload global pool balance after deposit action
       }catch(err){ console.error(err); toast('Action failed'); }
   });
 
@@ -663,16 +665,26 @@
     try{
       const data = await get(`${state.apiBase}/earnings/admin/global-pool/`);
       $('#globalPayoutDay').textContent = data.payout_day || 'Monday';
-      $('#globalPayoutAmount').textContent = data.last_payout?.amount_usd || '—';
+      $('#globalPoolBalance').textContent = `$${Number(data.pool_balance_usd || 0).toFixed(2)} USD`;
+      $('#globalPayoutAmount').textContent = data.last_payout?.amount_usd ? `$${Number(data.last_payout.amount_usd).toFixed(2)} USD` : '—';
       const tbody = $('#globalPoolUsersTbody');
       const rows = data.per_user_passive || [];
       tbody.innerHTML = rows.length ? '' : '<tr><td colspan="2" class="muted">No data</td></tr>';
       rows.forEach(r=>{
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td>${escapeHtml(r.username)}</td><td>${Number(r.total_passive_usd||0).toFixed(2)}</td>`;
+        tr.innerHTML = `<td>${escapeHtml(r.username)}</td><td>$${Number(r.total_passive_usd||0).toFixed(2)} USD</td>`;
         tbody.appendChild(tr);
       });
     }catch(e){ console.error(e); toast('Failed to load global pool'); }
+  }
+
+  // System Overview
+  async function loadSystemOverview(){
+    try{
+      const data = await get(`${state.apiBase}/earnings/admin/system-overview/`);
+      // Just display this data; it's mostly static config values
+      console.log('System Overview:', data);
+    }catch(e){ console.error(e); toast('Failed to load system overview'); }
   }
 
 
@@ -691,4 +703,5 @@
   loadWithdrawals();
   loadReferrals();
   loadProofs();
+  loadGlobalPool();
 })();

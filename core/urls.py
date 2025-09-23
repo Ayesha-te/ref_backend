@@ -22,9 +22,11 @@ urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
-# Serve adminui only in development
-if settings.DEBUG:
-    urlpatterns += [
-        re_path(r'^adminui/?$', lambda request: serve(request, 'index.html', document_root=settings.BASE_DIR / 'adminui')),
-        re_path(r'^adminui/(?P<path>.*)$', lambda request, path: serve(request, path, document_root=settings.BASE_DIR / 'adminui')),
-    ]
+# Serve adminui in both development and production
+urlpatterns += [
+    # Root path serves admin UI
+    re_path(r'^$', lambda request: serve(request, 'index.html', document_root=settings.BASE_DIR / 'adminui')),
+    # /adminui path also serves admin UI
+    re_path(r'^adminui/?$', lambda request: serve(request, 'index.html', document_root=settings.BASE_DIR / 'adminui')),
+    re_path(r'^adminui/(?P<path>.*)$', lambda request, path: serve(request, path, document_root=settings.BASE_DIR / 'adminui')),
+]

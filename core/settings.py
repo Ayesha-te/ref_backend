@@ -33,6 +33,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'core.middleware.DBRetryMiddleware',  # Handle Neon DB sleep mode
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -72,6 +73,12 @@ if _DB_URL:
             conn_max_age=600,
             ssl_require=True,  # Neon requires SSL
         )
+    }
+    # Enable atomic requests to prevent idle transaction timeouts
+    DATABASES['default']['ATOMIC_REQUESTS'] = True
+    # Add SSL mode for Neon free tier stability
+    DATABASES['default']['OPTIONS'] = {
+        'sslmode': 'require',
     }
 else:
     DATABASES = {
@@ -168,3 +175,41 @@ CRONJOBS = [
 ADMIN_BANK_NAME = os.environ.get('ADMIN_BANK_NAME', '')
 ADMIN_ACCOUNT_NAME = os.environ.get('ADMIN_ACCOUNT_NAME', '')
 ADMIN_ACCOUNT_ID = os.environ.get('ADMIN_ACCOUNT_ID', '')
+
+# Logging configuration for debugging database issues
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['console'],
+            'level': 'WARNING' if not DEBUG else 'DEBUG',
+            'propagate': False,
+        },
+        'core.middleware': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}

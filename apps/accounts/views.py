@@ -255,7 +255,7 @@ class AdminUsersListView(generics.GenericAPIView):
 
         users = users.annotate(
             rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
-            passive_income_usd=Coalesce(Sum('passive_earnings__amount_usd', filter=models.Q(passive_earnings__type='PASSIVE')), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
+            passive_income_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
             bank_name=Subquery(latest_dr.values('bank_name')[:1], output_field=CharField()),
             account_name=Subquery(latest_dr.values('account_name')[:1], output_field=CharField()),
             referrals_count=Count('referrals', distinct=True),  # direct referrals

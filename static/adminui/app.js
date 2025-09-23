@@ -29,6 +29,39 @@
     setTimeout(()=>{ el.style.display = 'none'; }, 2000);
   };
 
+  // Global functions for debugging
+  window.setApiBase = function(url) {
+    state.apiBase = url.replace(/\/$/, '');
+    try{ localStorage.setItem('adminApiBase', state.apiBase); }catch(_){ }
+    console.log('API Base manually set to:', state.apiBase);
+    toast('API Base updated to: ' + state.apiBase);
+  };
+  
+  window.getApiBase = function() {
+    console.log('Current API Base:', state.apiBase);
+    return state.apiBase;
+  };
+  
+  window.testApi = async function() {
+    try {
+      const response = await fetch(`${state.apiBase}/auth/token/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: '__probe__', password: '__probe__' })
+      });
+      console.log('API Test Result:', response.status, response.statusText);
+      return response.status;
+    } catch (e) {
+      console.error('API Test Failed:', e);
+      return false;
+    }
+  };
+
+  console.log('Admin UI Debug Commands:');
+  console.log('- setApiBase("http://192.168.100.141:8000/api") - Set API base manually');
+  console.log('- getApiBase() - Get current API base');
+  console.log('- testApi() - Test API connection');
+
   // Render current API base (no longer shown in UI)
   function showApiBase(){}
 
@@ -37,6 +70,7 @@
     const productionBackend = 'https://ref-backend-8arb.onrender.com/api';
     const candidates = [
       productionBackend,  // Production backend (Render)
+      'http://192.168.100.141:8000/api',  // Network IP
       'http://127.0.0.1:8000/api',  // Local Django server
       'http://localhost:8000/api',   // Alternative local address
       location.origin.replace(/:\d+$/, '') + ':8000/api',  // Dynamic local Django
@@ -68,21 +102,23 @@
     
     // Try production backend first
     const productionBase = 'https://ref-backend-8arb.onrender.com/api';
+    console.log('Testing production backend:', productionBase);
     try {
       const testResponse = await fetch(`${productionBase}/auth/token/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: '__probe__', password: '__probe__' })
       });
+      console.log('Production backend response:', testResponse.status);
       if ([400, 401].includes(testResponse.status)) {
         state.apiBase = productionBase;
         try{ localStorage.setItem('adminApiBase', productionBase); }catch(_){ }
-        console.log('Admin UI connected to PRODUCTION backend:', productionBase);
+        console.log('✅ Admin UI connected to PRODUCTION backend:', productionBase);
         showApiBase();
         return;
       }
     } catch (e) {
-      console.error('Production backend connection failed:', e.message);
+      console.error('❌ Production backend connection failed:', e.message);
       if (isProduction) {
         // In production, show error and don't try localhost
         setStatus('❌ Backend connection failed. CORS or network issue detected.');
@@ -97,22 +133,31 @@
     
     // Only try local development if not in production
     if (!isProduction) {
-      const localBase = 'http://127.0.0.1:8000/api';
-      try {
-        const testResponse = await fetch(`${localBase}/auth/token/`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: '__probe__', password: '__probe__' })
-        });
-        if ([400, 401].includes(testResponse.status)) {
-          state.apiBase = localBase;
-          try{ localStorage.setItem('adminApiBase', localBase); }catch(_){ }
-          console.log('Admin UI connected to LOCAL server:', localBase);
-          showApiBase();
-          return;
+      // Try multiple local addresses including network IP
+      const localCandidates = [
+        'http://127.0.0.1:8000/api',
+        'http://localhost:8000/api',
+        'http://192.168.100.141:8000/api',  // Network IP
+        location.origin.replace(/:\d+$/, '') + ':8000/api'  // Dynamic IP with port 8000
+      ];
+      
+      for (const localBase of localCandidates) {
+        try {
+          const testResponse = await fetch(`${localBase}/auth/token/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: '__probe__', password: '__probe__' })
+          });
+          if ([400, 401].includes(testResponse.status)) {
+            state.apiBase = localBase;
+            try{ localStorage.setItem('adminApiBase', localBase); }catch(_){ }
+            console.log('Admin UI connected to LOCAL server:', localBase);
+            showApiBase();
+            return;
+          }
+        } catch (e) {
+          console.log(`Local server ${localBase} not available:`, e.message);
         }
-      } catch (e) {
-        console.log('Local server not available, falling back to production...');
       }
       
       // Fallback to production if local fails
@@ -141,27 +186,6 @@
     } else {
       authStatusEl.textContent = message || 'Not Authenticated';
       authStatusEl.style.color = '#dc3545';
-    }
-  };
-
-  const handleApiError = (error, endpoint = '') => {
-    console.error('API Error:', error);
-    
-    if (error.message && error.message.includes('Failed to fetch')) {
-      if (endpoint.includes('cors') || error.message.includes('CORS')) {
-        setStatus('❌ CORS Error: Backend not configured for this domain');
-        return 'CORS configuration issue detected. Contact administrator.';
-      } else {
-        setStatus('❌ Network Error: Cannot reach backend server');
-        return 'Backend server is unreachable. Check your connection.';
-      }
-    } else if (error.message && error.message.includes('401')) {
-      setStatus('❌ Authentication Error: Please login again');
-      setAuthStatus(false, 'Authentication expired');
-      return 'Authentication failed. Please login again.';
-    } else {
-      setStatus('❌ API Error: ' + (error.message || 'Unknown error'));
-      return error.message || 'An unknown error occurred.';
     }
   };
 
@@ -576,13 +600,17 @@
 
   // User actions for main users table
   $('#usersTbody').addEventListener('click', async (e)=>{
+    console.log('User table click detected:', e.target);
     const btn = e.target.closest('button');
     if(!btn) return;
     const id = btn.dataset.id;
     const action = btn.dataset.action;
+    console.log('User action:', action, 'ID:', id, 'API Base:', state.apiBase);
     try{
       if(action === 'reject'){
-        await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Attempting to reject user:', id);
+        const response = await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Reject response:', response);
         toast('User rejected');
       } else if(action === 'activate'){
         await post(`${state.apiBase}/accounts/admin/activate/${id}/`);
@@ -593,7 +621,10 @@
       }
       await loadUsers();
       await loadDashboard();
-    }catch(err){ console.error(err); toast('Action failed'); }
+    }catch(err){ 
+      console.error('User action error:', err); 
+      toast('Action failed: ' + (err.message || 'Unknown error')); 
+    }
   });
 
   // Users (pending) list and actions
@@ -631,20 +662,29 @@
   }
 
   $('#pendingUsersTbody').addEventListener('click', async (e)=>{
+    console.log('Pending users table click detected:', e.target);
     const btn = e.target.closest('button');
     if(!btn) return;
     const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    console.log('Pending user action:', action, 'ID:', id, 'API Base:', state.apiBase);
     try{
       if(btn.dataset.action==='approve'){
+        console.log('Attempting to approve user:', id);
         await post(`${state.apiBase}/accounts/admin/approve/${id}/`);
         toast('User approved');
       }else if(btn.dataset.action==='reject'){
-        await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Attempting to reject pending user:', id);
+        const response = await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Reject response:', response);
         toast('User rejected');
       }
       await loadPendingUsers();
       await loadDashboard();
-    }catch(err){ console.error(err); toast('Action failed'); }
+    }catch(err){ 
+      console.error('Pending user action error:', err); 
+      toast('Action failed: ' + (err.message || 'Unknown error')); 
+    }
   });
 
   // Withdrawals - function moved below to avoid duplicates
@@ -822,12 +862,14 @@
     tbody.innerHTML = '<tr><td colspan="9" class="muted">Loading...</td></tr>';
     try{
       const rows = await get(`${state.apiBase}/withdrawals/admin/pending/`);
+      console.log('Withdrawals data loaded:', rows);
       if(!rows.length){ 
         tbody.innerHTML = '<tr><td colspan="9" class="muted">No pending withdrawals</td></tr>'; 
         return; 
       }
       tbody.innerHTML = '';
       rows.forEach(w=>{
+        console.log('Processing withdrawal:', w.id, 'TX ID:', w.tx_id);
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${w.id}</td>

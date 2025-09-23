@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexocart Admin Panel</title>
+  <link rel="stylesheet" href="/static/adminui/styles.css" />
+  <style>
+    :root{--bg:#0b0b0e;--panel:#141419;--accent:#ef4444;--muted:#8b8ca3;--text:#f5f7fb;--border:#252533;--ok:#22c55e;--warn:#f59e0b}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;display:flex;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;overflow-x:hidden;overflow-y:auto}
+    .sidebar{width:280px;min-width:280px;background:var(--panel);border-right:1px solid var(--border);padding:16px;display:flex;flex-direction:column;gap:16px;position:sticky;top:0;height:100vh;overflow-y:auto}
+    .brand{display:flex;gap:12px;align-items:center}
+    .brand .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ff6243,#ff8843);display:grid;place-items:center;font-weight:800;color:white}
+    .brand h1{margin:0;font-size:18px}
+    .brand p{margin:0;color:var(--muted);font-size:12px}
+    .nav-btn{width:100%;text-align:left;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text);cursor:pointer}
+    .nav-btn:hover{background:#1a1b22}
+    .content{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow-x:hidden;overflow-y:auto}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;padding:16px;border-bottom:1px solid var(--border)}
+    .btn{background:var(--accent);border:none;color:white;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn.secondary{background:#242532;border:1px solid var(--border)}
+    .btn.ok{background:var(--ok)}
+    .section{display:none;padding:16px;overflow-x:hidden;flex:1}
+    .section.active{display:block;overflow-y:auto}
+    .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;width:100%}
+    .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px}
+    .card h3{margin:0 0 8px}
+    .stat{font-size:24px;font-weight:800}
+    .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow-x:auto;overflow-y:visible;max-width:100%}
+    table{width:100%;min-width:max-content;border-collapse:collapse}
+    th,td{padding:10px 12px;border-bottom:1px solid var(--border)}
+    th{text-align:left;color:var(--muted);font-weight:600}
+    tr:hover td{background:#16161f}
+    .muted{color:var(--muted)}
+    .toast{position:fixed;right:16px;bottom:16px;background:#1a1b22;border:1px solid var(--border);padding:10px 12px;border-radius:12px;display:none}
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">N</div>
+      <div>
+        <h1>Nexocart</h1>
+        <p>Admin Panel</p>
+        <button id="approveUsersBtn" class="btn">Approve Users</button>
+      </div>
+    </div>
+    <nav>
+      <button class="nav-btn" data-section="dashboard">Dashboard</button>
+      <button class="nav-btn" data-section="users">Users</button>
+      <button class="nav-btn" data-section="deposits">Deposits</button>
+      <button class="nav-btn" data-section="withdrawals">Withdrawals</button>
+      <button class="nav-btn" data-section="referrals">Referrals</button>
+      <button class="nav-btn" data-section="proofs">Signup Proofs</button>
+      <button class="nav-btn" data-section="system">System</button>
+      <button class="nav-btn" data-section="globalpool">Global Pool</button>
+      <button class="nav-btn" data-section="systemoverview">System Overview</button>
+      <button class="nav-btn" data-section="products">Products</button>
+      <button class="nav-btn" data-section="orders">Orders</button>
+    </nav>
+    <div class="spacer"></div>
+    <div class="config">
+      <label>API Base</label>
+      <input id="apiBase" placeholder="https://backend.com/api" />
+    </div>
+  </aside>
+
+  <main class="content">
+    <header class="toolbar">
+      <h2 id="pageTitle">Admin Panel</h2>
+      <div class="toolbar-right">
+        <div id="authStatus" class="auth-status">Not logged in</div>
+        <button id="loginBtn" class="btn">Login</button>
+        <div id="loginForm" style="display:none;">
+          <input id="username" type="text" placeholder="Username" />
+          <input id="password" type="password" placeholder="Password" />
+          <button id="doLogin" class="btn">Go</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="status" class="status"></div>
+
+    <!-- Dashboard -->
+    <section id="dashboard" class="section active">
+      <div class="section-head">
+        <h3>Dashboard</h3>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <h3>Total Users</h3>
+          <div id="statTotalUsers" class="stat">—</div>
+        </div>
+        <div class="card">
+          <h3>Pending Users</h3>
+          <div id="statPendingUsers" class="stat">—</div>
+        </div>
+        <div class="card">
+          <h3>Pending Deposits</h3>
+          <div id="statPendingDeposits" class="stat">—</div>
+        </div>
+        <div class="card">
+          <h3>Pending Withdrawals</h3>
+          <div id="statPendingWithdrawals" class="stat">—</div>
+        </div>
+        <div class="card">
+          <h3>Total Referrals</h3>
+          <div id="statTotalReferrals" class="stat">—</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Users -->
+    <section id="users" class="section">
+      <div class="section-head">
+        <h3>Users</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Full Name</th>
+              <th>Active</th>
+              <th>Approved</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="usersTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Pending Users -->
+    <section id="pendingUsers" class="section">
+      <div class="section-head">
+        <h3>Pending Users</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Full Name</th>
+              <th>Phone</th>
+              <th>Referred By</th>
+              <th>Joined</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingUsersTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Deposits -->
+    <section id="deposits" class="section">
+      <div class="section-head">
+        <h3>Pending Deposits</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Amount (PKR)</th>
+              <th>Amount (USD)</th>
+              <th>Bank</th>
+              <th>Account</th>
+              <th>Proof</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="depositsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Withdrawals -->
+    <section id="withdrawals" class="section">
+      <div class="section-head">
+        <h3>Pending Withdrawals</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>TX ID</th>
+              <th>Bank</th>
+              <th>Account</th>
+              <th>Amount (USD)</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="withdrawalsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Referrals -->
+    <section id="referrals" class="section">
+      <div class="section-head">
+        <h3>Referrals</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Referrer</th>
+              <th>Referee</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="referralsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Signup Proofs -->
+    <section id="proofs" class="section">
+      <div class="section-head">
+        <h3>Signup Proofs</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Proof Image</th>
+              <th>Uploaded</th>
+            </tr>
+          </thead>
+          <tbody id="proofsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Products -->
+    <section id="products" class="section">
+      <div class="section-head">
+        <h3>Products</h3>
+        <button id="addProductBtn" class="btn">Add Product</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Price (USD)</th>
+              <th>Available</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Orders -->
+    <section id="orders" class="section">
+      <div class="section-head">
+        <h3>Orders</h3>
+        <div class="filters">
+          <select id="ordersFilterStatus">
+            <option value="">All Statuses</option>
+            <option value="PENDING">Pending</option>
+            <option value="PROCESSING">Processing</option>
+            <option value="SHIPPED">Shipped</option>
+            <option value="DELIVERED">Delivered</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>User</th>
+              <th>Products</th>
+              <th>Total</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- System -->
+    <section id="system" class="section">
+      <div class="section-head">
+        <h3>System Status</h3>
+      </div>
+      <div id="systemContent">
+        <div class="muted">Select System to load data</div>
+      </div>
+    </section>
+
+    <!-- Global Pool -->
+    <section id="globalpool" class="section">
+      <div class="section-head">
+        <h3>Global Pool Management</h3>
+        <button id="distributeGlobalPoolBtn" class="btn">Distribute Global Pool</button>
+      </div>
+      <div id="globalPoolContent">
+        <div class="muted">Loading global pool data...</div>
+      </div>
+    </section>
+
+    <!-- System Overview -->
+    <section id="systemoverview" class="section">
+      <div class="section-head">
+        <h3>System Overview</h3>
+      </div>
+      <div id="systemOverviewContent">
+        <div class="muted">Loading system overview...</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/static/adminui/app.js"></script>
+</body>
+</html>

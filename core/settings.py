@@ -135,6 +135,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://192.168.100.141:3000",  # Network IP for admin UI
+    "http://192.168.100.141:8000",  # Network IP for backend
 ]
 
 # Additional CORS headers for preflight requests

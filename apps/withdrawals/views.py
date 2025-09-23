@@ -85,6 +85,9 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
                 account_details = {}
         bank_name = self.request.data.get('bank_name') or account_details.get('bank') or ''
         account_name = self.request.data.get('account_name') or account_details.get('account_name') or ''
+        tx_id = self.request.data.get('tx_id') or ''  # Get TX ID from frontend
+        
+        print(f"DEBUG: Creating withdrawal - TX ID from frontend: {repr(tx_id)}")
 
         serializer.save(
             user=self.request.user,
@@ -96,6 +99,7 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
             account_details=account_details,
             bank_name=bank_name,
             account_name=account_name,
+            tx_id=tx_id,  # Include TX ID in save
         )
 
 @api_view(['GET'])

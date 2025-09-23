@@ -192,14 +192,20 @@ def admin_approve_user(request, pk):
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])
 def admin_reject_user(request, pk):
+    print(f"DEBUG: admin_reject_user called with pk={pk}, user={request.user}")
     try:
         user = User.objects.get(pk=pk)
+        print(f"DEBUG: Found user {user.username} (id={user.id})")
     except User.DoesNotExist:
+        print(f"DEBUG: User with pk={pk} not found")
         return Response({"detail": "User not found"}, status=404)
+    
     # Keep account but mark inactive and not approved
+    print(f"DEBUG: Before rejection - is_approved={user.is_approved}, is_active={user.is_active}")
     user.is_approved = False
     user.is_active = False
     user.save()
+    print(f"DEBUG: After rejection - is_approved={user.is_approved}, is_active={user.is_active}")
     return Response({"status": "REJECTED"})
 
 @api_view(['POST'])

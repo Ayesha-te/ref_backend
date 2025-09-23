@@ -144,27 +144,6 @@
     }
   };
 
-  const handleApiError = (error, endpoint = '') => {
-    console.error('API Error:', error);
-    
-    if (error.message && error.message.includes('Failed to fetch')) {
-      if (endpoint.includes('cors') || error.message.includes('CORS')) {
-        setStatus('❌ CORS Error: Backend not configured for this domain');
-        return 'CORS configuration issue detected. Contact administrator.';
-      } else {
-        setStatus('❌ Network Error: Cannot reach backend server');
-        return 'Backend server is unreachable. Check your connection.';
-      }
-    } else if (error.message && error.message.includes('401')) {
-      setStatus('❌ Authentication Error: Please login again');
-      setAuthStatus(false, 'Authentication expired');
-      return 'Authentication failed. Please login again.';
-    } else {
-      setStatus('❌ API Error: ' + (error.message || 'Unknown error'));
-      return error.message || 'An unknown error occurred.';
-    }
-  };
-
   function authHeaders(headers={}){
     if(state.access){ 
       headers['Authorization'] = `Bearer ${state.access}`;
@@ -576,13 +555,17 @@
 
   // User actions for main users table
   $('#usersTbody').addEventListener('click', async (e)=>{
+    console.log('User table click detected:', e.target);
     const btn = e.target.closest('button');
     if(!btn) return;
     const id = btn.dataset.id;
     const action = btn.dataset.action;
+    console.log('User action:', action, 'ID:', id, 'API Base:', state.apiBase);
     try{
       if(action === 'reject'){
-        await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Attempting to reject user:', id);
+        const response = await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Reject response:', response);
         toast('User rejected');
       } else if(action === 'activate'){
         await post(`${state.apiBase}/accounts/admin/activate/${id}/`);
@@ -593,7 +576,10 @@
       }
       await loadUsers();
       await loadDashboard();
-    }catch(err){ console.error(err); toast('Action failed'); }
+    }catch(err){ 
+      console.error('User action error:', err); 
+      toast('Action failed: ' + (err.message || 'Unknown error')); 
+    }
   });
 
   // Users (pending) list and actions
@@ -631,20 +617,29 @@
   }
 
   $('#pendingUsersTbody').addEventListener('click', async (e)=>{
+    console.log('Pending users table click detected:', e.target);
     const btn = e.target.closest('button');
     if(!btn) return;
     const id = btn.dataset.id;
+    const action = btn.dataset.action;
+    console.log('Pending user action:', action, 'ID:', id, 'API Base:', state.apiBase);
     try{
       if(btn.dataset.action==='approve'){
+        console.log('Attempting to approve user:', id);
         await post(`${state.apiBase}/accounts/admin/approve/${id}/`);
         toast('User approved');
       }else if(btn.dataset.action==='reject'){
-        await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Attempting to reject pending user:', id);
+        const response = await post(`${state.apiBase}/accounts/admin/reject/${id}/`);
+        console.log('Reject response:', response);
         toast('User rejected');
       }
       await loadPendingUsers();
       await loadDashboard();
-    }catch(err){ console.error(err); toast('Action failed'); }
+    }catch(err){ 
+      console.error('Pending user action error:', err); 
+      toast('Action failed: ' + (err.message || 'Unknown error')); 
+    }
   });
 
   // Withdrawals - function moved below to avoid duplicates

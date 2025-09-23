@@ -255,6 +255,7 @@ class AdminUsersListView(generics.GenericAPIView):
 
         users = users.annotate(
             rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
+            passive_income_usd=Coalesce(Sum('passive_earnings__amount_usd', filter=models.Q(passive_earnings__type='PASSIVE')), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
             bank_name=Subquery(latest_dr.values('bank_name')[:1], output_field=CharField()),
             account_name=Subquery(latest_dr.values('account_name')[:1], output_field=CharField()),
             referrals_count=Count('referrals', distinct=True),  # direct referrals
@@ -276,8 +277,16 @@ class AdminUsersListView(generics.GenericAPIView):
         end = start + page_size
         page_qs = users[start:end]
 
-        data = [
-            {
+        data = []
+        for u in page_qs:
+            # Get current wallet balance
+            try:
+                wallet = u.wallet
+                current_balance_usd = str(wallet.available_usd)
+            except:
+                current_balance_usd = '0.00'
+            
+            data.append({
                 'id': u.id,
                 'username': u.username,
                 'first_name': u.first_name,
@@ -289,12 +298,12 @@ class AdminUsersListView(generics.GenericAPIView):
                 'date_joined': u.date_joined,
                 'last_login': u.last_login,
                 'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
+                'passive_income_usd': str(getattr(u, 'passive_income_usd', 0) or 0),
+                'current_balance_usd': current_balance_usd,
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',
                 'referrals_count': getattr(u, 'referrals_count', 0) or 0,
-            }
-            for u in page_qs
-        ]
+            })
 
         return Response({
             'count': total,

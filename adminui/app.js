@@ -472,7 +472,8 @@
   $$('.nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const id = btn.dataset.section;
-      $('#sectionTitle').textContent = btn.textContent; // fix: use single element selector
+      const headerTitle = $('#sectionTitle') || $('#pageTitle');
+      if (headerTitle) headerTitle.textContent = btn.textContent;
       $$('.section').forEach(s => s.classList.remove('active'));
       $('#'+id).classList.add('active');
       // Auto-load when switching sections (only if logged in when admin endpoints)
@@ -620,9 +621,12 @@
       // pagination info
       const total = data.count || 0;
       const totalPages = Math.max(1, Math.ceil(total / usersState.pageSize));
-      $('#usersPageInfo').textContent = `Page ${usersState.page} of ${totalPages} (${total} users)`;
-      $('#usersPrev').disabled = usersState.page <= 1;
-      $('#usersNext').disabled = usersState.page >= totalPages;
+      const pageInfoEl = $('#usersPageInfo');
+      const prevEl = $('#usersPrev');
+      const nextEl = $('#usersNext');
+      if (pageInfoEl) pageInfoEl.textContent = `Page ${usersState.page} of ${totalPages} (${total} users)`;
+      if (prevEl) prevEl.disabled = usersState.page <= 1;
+      if (nextEl) nextEl.disabled = usersState.page >= totalPages;
     }catch(e){
       console.error(e); tbody.innerHTML = '<tr><td colspan="16" class="muted">Failed to load</td></tr>';
     }

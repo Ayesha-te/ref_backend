@@ -180,12 +180,25 @@
   
   const setAuthStatus = (isAuthenticated, message = '') => {
     const authStatusEl = $('#authStatus');
-    if (isAuthenticated) {
-      authStatusEl.textContent = message || 'Authenticated ✓';
-      authStatusEl.style.color = '#28a745';
-    } else {
-      authStatusEl.textContent = message || 'Not Authenticated';
-      authStatusEl.style.color = '#dc3545';
+    const loginBtn = $('#loginBtn');
+    const loginForm = $('#loginForm');
+    
+    if (authStatusEl) {
+      if (isAuthenticated) {
+        authStatusEl.textContent = message || 'Authenticated ✓';
+        authStatusEl.style.color = '#28a745';
+      } else {
+        authStatusEl.textContent = message || 'Not Authenticated';
+        authStatusEl.style.color = '#dc3545';
+      }
+    }
+    
+    if (loginBtn) {
+      loginBtn.textContent = isAuthenticated ? 'Logout' : 'Login';
+    }
+    
+    if (loginForm) {
+      loginForm.style.display = 'none';
     }
   };
 
@@ -275,14 +288,16 @@
   };
 
   async function login(username, password){
+    console.log('Attempting login with:', username, 'to API:', state.apiBase);
     const res = await fetch(`${state.apiBase}/auth/token/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password })
     });
+    console.log('Login response status:', res.status);
     if(!res.ok){
       let detail = 'Login failed';
-      try { const data = await res.json(); detail = data?.detail || detail; } catch(_){ try{ detail = await res.text() || detail; }catch(__){}
+      try { const data = await res.json(); detail = data?.detail || detail; console.log('Login error data:', data); } catch(_){ try{ detail = await res.text() || detail; console.log('Login error text:', detail); }catch(__){}
       }
       throw new Error(`[${res.status}] ${detail}`);
     }
@@ -476,17 +491,62 @@
   });
 
   // Login bindings
-  $('#loginBtn').addEventListener('click', async ()=>{
-    try{
-      const u = $('#loginUsername').value.trim();
-      const p = $('#loginPassword').value;
-      if(!u||!p){ toast('Enter username and password'); return; }
-      await login(u,p);
-      // On login, refresh all sections
-      loadDashboard(); loadUsers(); loadPendingUsers(); loadDeposits(); loadWithdrawals(); loadReferrals(); loadProofs(); loadProducts(); loadGlobalPool(); loadSystemOverview();
-    }catch(e){ handleApiError(e, 'login'); }
-  });
-  $('#logoutBtn').addEventListener('click', ()=>{ logout(); });
+  const loginBtn = $('#loginBtn');
+  const loginForm = $('#loginForm');
+  const usernameInput = $('#username');
+  const passwordInput = $('#password');
+  const doLoginBtn = $('#doLogin');
+  
+  if (loginBtn) {
+    loginBtn.addEventListener('click', ()=>{
+      // Handle logout if already logged in
+      if(loginBtn.textContent === 'Logout'){
+        logout();
+        loginBtn.textContent = 'Login';
+        if (loginForm) loginForm.style.display = 'none';
+        return;
+      }
+      
+      // Show/hide login form
+      if(loginForm){
+        if(loginForm.style.display === 'none'){
+          loginForm.style.display = 'flex';
+          loginBtn.textContent = 'Cancel';
+          if (usernameInput) usernameInput.focus();
+        } else {
+          loginForm.style.display = 'none';
+          loginBtn.textContent = 'Login';
+        }
+      }
+    });
+  }
+  
+  if (doLoginBtn) {
+    doLoginBtn.addEventListener('click', async ()=>{
+      try{
+        const u = usernameInput ? usernameInput.value.trim() : '';
+        const p = passwordInput ? passwordInput.value : '';
+        if(!u||!p){ toast('Enter username and password'); return; }
+        await login(u,p);
+        if (loginForm) loginForm.style.display = 'none';
+        if (loginBtn) loginBtn.textContent = 'Logout';
+        // On login, refresh all sections
+        loadDashboard(); loadUsers(); loadPendingUsers(); loadDeposits(); loadWithdrawals(); loadReferrals(); loadProofs(); loadProducts(); loadGlobalPool(); loadSystemOverview();
+      }catch(e){ handleApiError(e, 'login'); }
+    });
+  }
+  
+  // Handle Enter key in login inputs
+  if (usernameInput) {
+    usernameInput.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter' && passwordInput) passwordInput.focus();
+    });
+  }
+  if (passwordInput) {
+    passwordInput.addEventListener('keypress', (e) => {
+      if(e.key === 'Enter' && doLoginBtn) doLoginBtn.click();
+    });
+  }
 
   // Dashboard stats loaders
   async function loadDashboard(){

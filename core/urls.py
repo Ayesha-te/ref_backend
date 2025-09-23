@@ -22,11 +22,14 @@ urlpatterns += [
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
 
-# Serve adminui in both development and production
+# Serve adminui only from /adminui and restrict to staff
+from django.contrib.auth.decorators import user_passes_test
+
+def staff_only(view_func):
+    return user_passes_test(lambda u: u.is_staff or u.is_superuser)(view_func)
+
 urlpatterns += [
-    # Root path serves admin UI
-    re_path(r'^$', lambda request: serve(request, 'index_django.html', document_root=settings.BASE_DIR / 'adminui')),
-    # /adminui path also serves admin UI
-    re_path(r'^adminui/?$', lambda request: serve(request, 'index_django.html', document_root=settings.BASE_DIR / 'adminui')),
-    re_path(r'^adminui/(?P<path>.*)$', lambda request, path: serve(request, path, document_root=settings.BASE_DIR / 'adminui')),
+    # Protect /adminui behind staff auth; do not serve admin UI at root
+    re_path(r'^adminui/?$', staff_only(lambda request: serve(request, 'index_django.html', document_root=settings.BASE_DIR / 'adminui'))),
+    re_path(r'^adminui/(?P<path>.*)$', staff_only(lambda request, path: serve(request, path, document_root=settings.BASE_DIR / 'adminui'))),
 ]

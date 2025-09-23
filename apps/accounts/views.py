@@ -112,8 +112,11 @@ class AdminPendingUsersView(generics.GenericAPIView):
     def get(self, request, *args, **kwargs):
         latest_pending_proof = SignupProof.objects.filter(user=OuterRef('pk'), status='PENDING').order_by('-created_at')
         users = (
-            User.objects.filter(is_approved=False)
+            User.objects
+            .filter(is_approved=False)
+            .filter(models.Exists(latest_pending_proof))  # Only users who currently have a PENDING signup proof
             .annotate(
+                signup_proof_id=Subquery(latest_pending_proof.values('id')[:1]),
                 signup_tx_id=Subquery(latest_pending_proof.values('tx_id')[:1], output_field=CharField()),
                 signup_proof_path=Subquery(latest_pending_proof.values('proof_image')[:1], output_field=CharField()),
                 submitted_at=Subquery(latest_pending_proof.values('created_at')[:1]),
@@ -137,6 +140,7 @@ class AdminPendingUsersView(generics.GenericAPIView):
                 'first_name': u.first_name,
                 'last_name': u.last_name,
                 'email': u.email,
+                'signup_proof_id': getattr(u, 'signup_proof_id', None),
                 'signup_tx_id': getattr(u, 'signup_tx_id', None) or '',
                 'signup_proof_url': build_proof_url(getattr(u, 'signup_proof_path', None)),
                 'submitted_at': getattr(u, 'submitted_at', None),

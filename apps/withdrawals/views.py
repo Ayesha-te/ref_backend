@@ -25,16 +25,35 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         # Validate amount_pkr
         amount_pkr_raw = self.request.data.get('amount_pkr')
+        print(f"DEBUG: Received amount_pkr_raw: {repr(amount_pkr_raw)} (type: {type(amount_pkr_raw)})")
+        print(f"DEBUG: Request data: {dict(self.request.data)}")
+        
         if amount_pkr_raw in (None, ""):
             raise ValidationError({"amount_pkr": ["This field is required."]})
         try:
-            amount_pkr = Decimal(str(amount_pkr_raw))
-        except (InvalidOperation, TypeError):
+            # Handle both string and numeric inputs
+            if isinstance(amount_pkr_raw, str):
+                # Remove any locale-specific formatting (commas, spaces)
+                amount_pkr_clean = amount_pkr_raw.replace(',', '').replace(' ', '').strip()
+                amount_pkr = Decimal(amount_pkr_clean)
+            else:
+                amount_pkr = Decimal(str(amount_pkr_raw))
+            print(f"DEBUG: Converted amount_pkr: {amount_pkr}")
+        except (InvalidOperation, TypeError, ValueError) as e:
+            print(f"DEBUG: Conversion error: {e}")
             raise ValidationError({"amount_pkr": ["Invalid decimal amount."]})
+        
         if amount_pkr <= 0:
             raise ValidationError({"amount_pkr": ["Must be greater than 0."]})
-        if amount_pkr < 5000:
-            raise ValidationError({"amount_pkr": ["Minimum withdrawal amount is 5000 PKR."]})
+
+        # Check if user has minimum income requirement (5000 PKR total)
+        wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
+        total_income_usd = wallet.available_usd + wallet.hold_usd
+        total_income_pkr = total_income_usd * get_fx_rate()
+        
+        if total_income_pkr < Decimal('5000'):
+            print(f"DEBUG: User total income {total_income_pkr} PKR is less than 5000, raising validation error")
+            raise ValidationError({"amount_pkr": ["You need a minimum income of 5000 PKR to make withdrawals."]})
 
         # FX and USD conversion
         rate = get_fx_rate()
@@ -43,8 +62,7 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         except (InvalidOperation, ZeroDivisionError):
             raise ValidationError({"detail": ["Invalid FX rate configuration."]})
 
-        # Wallet checks
-        wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
+        # Wallet balance check (only check available balance, not minimum withdrawal amount)
         if amount_usd > wallet.available_usd:
             raise ValidationError({"detail": ["Insufficient balance."]})
 

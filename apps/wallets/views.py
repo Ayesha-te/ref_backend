@@ -49,6 +49,8 @@ class MyDepositsView(generics.ListCreateAPIView):
             raise ValidationError({"amount_pkr": ["Invalid decimal amount."]})
         if amount_pkr <= 0:
             raise ValidationError({"amount_pkr": ["Must be greater than 0."]})
+        if amount_pkr < 5000:
+            raise ValidationError({"amount_pkr": ["Minimum deposit amount is 5000 PKR."]})
 
         tx_id = self.request.data.get('tx_id')
         bank_name = self.request.data.get('bank_name', '')

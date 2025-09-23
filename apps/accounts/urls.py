@@ -6,6 +6,8 @@ from .views import (
     AdminPendingUsersView,
     admin_approve_user,
     admin_reject_user,
+    admin_activate_user,
+    admin_deactivate_user,
     MySignupProofsView,
     admin_pending_signup_proofs,
     admin_signup_proof_action,
@@ -27,6 +29,8 @@ urlpatterns = [
     path('admin/pending-users/', AdminPendingUsersView.as_view()),
     path('admin/approve/<int:pk>/', admin_approve_user),
     path('admin/reject/<int:pk>/', admin_reject_user),
+    path('admin/activate/<int:pk>/', admin_activate_user),
+    path('admin/deactivate/<int:pk>/', admin_deactivate_user),
     path('admin/pending-signup-proofs/', admin_pending_signup_proofs),
     path('admin/signup-proof/action/<int:pk>/', admin_signup_proof_action),
 

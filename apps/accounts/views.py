@@ -202,6 +202,28 @@ def admin_reject_user(request, pk):
     user.save()
     return Response({"status": "REJECTED"})
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_activate_user(request, pk):
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found"}, status=404)
+    user.is_active = True
+    user.save()
+    return Response({"status": "ACTIVATED"})
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def admin_deactivate_user(request, pk):
+    try:
+        user = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({"detail": "User not found"}, status=404)
+    user.is_active = False
+    user.save()
+    return Response({"status": "DEACTIVATED"})
+
 class AdminUsersListView(generics.GenericAPIView):
     """Admin endpoint returning users with rewards and bank details.
     Supports search, filters, sorting, and pagination.

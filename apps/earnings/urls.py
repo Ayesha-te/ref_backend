@@ -1,7 +1,8 @@
 from django.urls import path
 from .views import (
     MyEarningsSummary, AdminGlobalPoolView, AdminSystemOverviewView, 
-    generate_daily_earnings_api, scheduler_status_api, trigger_earnings_now_api
+    generate_daily_earnings_api, scheduler_status_api, trigger_earnings_now_api,
+    bulk_generate_earnings_api
 )
 from .admin_views import AdminGenerateEarningsView
 
@@ -19,4 +20,6 @@ urlpatterns = [
     path('scheduler-status/', scheduler_status_api, name='scheduler-status'),
     # API endpoint to manually trigger earnings now
     path('trigger-now/', trigger_earnings_now_api, name='trigger-earnings-now'),
+    # API endpoint to bulk generate sample earnings
+    path('bulk-generate/', bulk_generate_earnings_api, name='bulk-generate-earnings'),
 ]

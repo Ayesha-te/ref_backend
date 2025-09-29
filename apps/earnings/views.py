@@ -149,3 +149,61 @@ def trigger_earnings_now_api(request):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def bulk_generate_earnings_api(request):
+    """
+    API endpoint to generate sample earnings for all users
+    Only accessible by admin users
+    """
+    try:
+        days = int(request.data.get('days', 15))
+        reset = request.data.get('reset', False)
+        
+        if reset:
+            PassiveEarning.objects.all().delete()
+        
+        User = get_user_model()
+        users = User.objects.all()
+        total_created = 0
+        
+        for user in users:
+            user_created = 0
+            for day in range(1, days + 1):
+                # Progressive earnings calculation
+                base_amount = Decimal("100.00")
+                percent = Decimal("0.004") + (Decimal("0.0002") * day)
+                amount = base_amount * percent
+                
+                # Add variation
+                import random
+                variation = Decimal(str(random.uniform(-0.1, 0.1)))
+                amount = max(amount + variation, Decimal("0.01"))
+                
+                earning, created = PassiveEarning.objects.get_or_create(
+                    user=user,
+                    day_index=day,
+                    defaults={
+                        'percent': percent,
+                        'amount_usd': amount
+                    }
+                )
+                
+                if created:
+                    user_created += 1
+                    total_created += 1
+        
+        return Response({
+            'success': True,
+            'message': f'Successfully created {total_created} earnings records for {users.count()} users',
+            'total_created': total_created,
+            'users_count': users.count()
+        })
+        
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)

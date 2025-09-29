@@ -2,11 +2,15 @@ from decimal import Decimal
 from django.db.models import Sum
 from rest_framework import views, permissions
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.core.management import call_command
 from apps.wallets.models import Wallet
 from .models import PassiveEarning
 from .models_global_pool import GlobalPool, GlobalPoolPayout
+import io
+import sys
 
 
 class MyEarningsSummary(views.APIView):
@@ -69,3 +73,79 @@ class AdminSystemOverviewView(views.APIView):
             'REFERRAL_TIERS': econ.get('REFERRAL_TIERS'),
             'FX_SOURCE': econ.get('FX_SOURCE'),
         })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def generate_daily_earnings_api(request):
+    """
+    API endpoint to trigger daily earnings generation
+    Only accessible by admin users
+    """
+    try:
+        # Capture the output of the management command
+        old_stdout = sys.stdout
+        sys.stdout = mystdout = io.StringIO()
+        
+        # Run the management command
+        call_command('run_daily_earnings')
+        
+        # Restore stdout and get the output
+        sys.stdout = old_stdout
+        output = mystdout.getvalue()
+        
+        return Response({
+            'success': True,
+            'message': 'Daily earnings generated successfully',
+            'output': output
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def scheduler_status_api(request):
+    """
+    API endpoint to check scheduler status
+    Only accessible by admin users
+    """
+    try:
+        from .scheduler import get_scheduler_status
+        status = get_scheduler_status()
+        
+        return Response({
+            'success': True,
+            'scheduler_status': status,
+            'message': 'Scheduler is running' if status['running'] else 'Scheduler is not running'
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def trigger_earnings_now_api(request):
+    """
+    API endpoint to manually trigger earnings generation immediately
+    Only accessible by admin users
+    """
+    try:
+        from .scheduler import trigger_daily_earnings_now
+        trigger_daily_earnings_now()
+        
+        return Response({
+            'success': True,
+            'message': 'Daily earnings triggered successfully'
+        })
+    except Exception as e:
+        return Response({
+            'success': False,
+            'error': str(e)
+        }, status=500)

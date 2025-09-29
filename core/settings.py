@@ -250,5 +250,31 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'apps.earnings.scheduler': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
+
+# =============================================================================
+# AUTOMATION SETTINGS
+# =============================================================================
+
+# Automatically enable scheduler in production (when DEBUG=False)
+# Can be overridden with ENABLE_SCHEDULER environment variable
+ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', str(not DEBUG)).lower() == 'true'
+
+# Scheduler configuration
+SCHEDULER_CONFIG = {
+    'DAILY_EARNINGS_HOUR': int(os.environ.get('DAILY_EARNINGS_HOUR', '0')),  # Default: midnight UTC
+    'DAILY_EARNINGS_MINUTE': int(os.environ.get('DAILY_EARNINGS_MINUTE', '1')),  # Default: 00:01 UTC
+    'HEARTBEAT_INTERVAL': int(os.environ.get('HEARTBEAT_INTERVAL', '3600')),  # Default: every hour
+}
+
+print(f"🔧 Automation enabled: {ENABLE_SCHEDULER}")
+print(f"🔧 Debug mode: {DEBUG}")
+print(f"🔧 Production mode: {not DEBUG}")
+if ENABLE_SCHEDULER:
+    print(f"⏰ Daily earnings scheduled for {SCHEDULER_CONFIG['DAILY_EARNINGS_HOUR']:02d}:{SCHEDULER_CONFIG['DAILY_EARNINGS_MINUTE']:02d} UTC")

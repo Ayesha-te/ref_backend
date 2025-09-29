@@ -202,8 +202,11 @@ ADMIN_USD_TO_PKR = float(os.environ.get('ADMIN_USD_TO_PKR', '280.0'))
 # Signup payment base in PKR
 SIGNUP_FEE_PKR = float(os.environ.get('SIGNUP_FEE_PKR', '1410'))
 
-# Weekly cron for global pool distribution (every Monday at 00:00 UTC)
+# Cron jobs for automated tasks
 CRONJOBS = [
+    # Daily earnings generation (every day at 00:01 UTC)
+    ('1 0 * * *', 'django.core.management.call_command', ['run_daily_earnings']),
+    # Weekly global pool distribution (every Monday at 00:00 UTC)
     ('0 0 * * 1', 'django.core.management.call_command', ['distribute_global_pool']),
 ]
 

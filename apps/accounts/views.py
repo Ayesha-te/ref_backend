@@ -285,13 +285,6 @@ class AdminUsersListView(generics.GenericAPIView):
         if dj_to:
             users = users.filter(date_joined__date__lte=dj_to)
 
-        # Subquery for transaction-based passive income (real earnings)
-        passive_transactions = Transaction.objects.filter(
-            wallet__user=OuterRef('pk'),
-            type=Transaction.CREDIT,
-            meta__type='passive'
-        ).aggregate(total=Sum('amount_usd'))['total']
-        
         users = users.annotate(
             # PassiveEarning model sum (might be dummy data)
             rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
@@ -303,7 +296,9 @@ class AdminUsersListView(generics.GenericAPIView):
                         wallet__user=OuterRef('pk'),
                         type=Transaction.CREDIT,
                         meta__type='passive'
-                    ).aggregate(total=Sum('amount_usd'))['total'],
+                    ).values('wallet__user')
+                    .annotate(total=Sum('amount_usd'))
+                    .values('total')[:1],
                     output_field=DecimalField(max_digits=12, decimal_places=2)
                 ), 
                 Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))

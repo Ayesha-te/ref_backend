@@ -22,7 +22,7 @@ def sync_to_production():
     print("=" * 60)
     
     # Production API base
-    api_base = "https://ref-backend-fw8y.onrender.com/api"
+    api_base = 'https://ref-backend-fw8y.onrender.com'
     
     # First, try to login to get admin access
     try:

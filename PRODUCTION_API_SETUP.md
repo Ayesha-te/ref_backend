@@ -64,7 +64,7 @@ path('generate-daily/', generate_daily_earnings_api, name='generate-daily-earnin
 
 ### Step 1: Get Admin Token
 ```powershell
-$response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+$response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
 $token = $response.access
 ```
 

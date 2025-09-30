@@ -30,7 +30,7 @@
 1. Deploy your updated code to Render
 2. Use external service (cron-job.org, UptimeRobot) to call:
    ```
-   POST https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/
+   POST https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/
    Authorization: Bearer YOUR_ADMIN_TOKEN
    ```
 

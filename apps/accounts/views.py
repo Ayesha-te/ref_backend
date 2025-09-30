@@ -11,7 +11,7 @@ from django.db.models.functions import Coalesce
 from .serializers import UserSerializer, SignupSerializer, SignupProofSerializer
 from .models import SignupProof
 from apps.earnings.models import PassiveEarning
-from apps.wallets.models import DepositRequest
+from apps.wallets.models import DepositRequest, Transaction
 
 User = get_user_model()
 

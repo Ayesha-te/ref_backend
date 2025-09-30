@@ -11,10 +11,48 @@
     return base;
   }
   const defaultApiBaseRaw =
-    (typeof localStorage !== 'undefined' && localStorage.getItem('adminApiBase')) ||
     new URLSearchParams(location.search).get('apiBase') ||
-    new URL('/api', location.origin).toString().replace(/\/$/, '');
+    'https://ref-backend-fw8y.onrender.com/api'; // Force production backend
   const defaultApiBase = normalizeApiBase(defaultApiBaseRaw);
+  
+  // Clear any conflicting localStorage that might cause issues
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('adminApiBase');
+    localStorage.setItem('adminApiBase', defaultApiBase);
+  }
+  
+  // Add immediate auto-login for production
+  window.quickLogin = async function() {
+    console.log('🚀 Manual login trigger...');
+    try {
+      await login('Ahmad', '12345');
+      console.log('✅ Manual login successful');
+      toast('✅ Logged in successfully!');
+      // Reload the dashboard
+      setTimeout(() => {
+        if (typeof loadDashboard === 'function') loadDashboard();
+      }, 500);
+    } catch (error) {
+      console.log('❌ Manual login failed:', error.message);
+      toast('❌ Login failed: ' + error.message);
+    }
+  };
+
+  // Add debugging function
+  window.debugAuth = function() {
+    console.log('🔍 Authentication Debug:');
+    console.log('- API Base:', state.apiBase);
+    console.log('- Access Token:', state.access ? `${state.access.substring(0, 30)}...` : 'null');
+    console.log('- Refresh Token:', state.refresh ? `${state.refresh.substring(0, 30)}...` : 'null');
+    console.log('- localStorage access:', localStorage.getItem('admin_access') ? 'exists' : 'missing');
+    console.log('- localStorage refresh:', localStorage.getItem('admin_refresh') ? 'exists' : 'missing');
+  };
+
+  console.log('🎮 Debug Commands Available:');
+  console.log('- quickLogin() - Manual login with Ahmad/12345');
+  console.log('- debugAuth() - Show current auth state');
+
+  console.log('🔧 DEBUG: Forced API base to:', defaultApiBase);
   // Initialize state with tokens from localStorage if available
   const state = {
     apiBase: defaultApiBase,
@@ -191,13 +229,33 @@
     
 
     
-    // Validate stored tokens after API base is set
-    setTimeout(async () => {
-      if (state.access || state.refresh) {
-        console.log('Validating stored authentication tokens...');
-        await validateStoredTokens();
-      }
-    }, 1000);
+    // Immediate authentication check
+    console.log('🔍 Checking authentication state...');
+    console.log('🔍 Access token exists:', !!state.access);
+    console.log('🔍 Refresh token exists:', !!state.refresh);
+    
+    if (state.access || state.refresh) {
+      console.log('✅ Found stored tokens, validating...');
+      setTimeout(() => validateStoredTokens(), 100);
+    } else {
+      console.log('❌ No stored tokens found, attempting auto-login...');
+      setTimeout(async () => {
+        try {
+          // Auto-login with Ahmad/12345 for production
+          await login('Ahmad', '12345');
+          console.log('✅ Auto-login successful');
+          toast('✅ Auto-login successful!');
+          // Load dashboard after successful login
+          setTimeout(() => {
+            if (typeof loadDashboard === 'function') loadDashboard();
+          }, 500);
+        } catch (error) {
+          console.log('❌ Auto-login failed:', error.message);
+          setAuthStatus(false, 'Auto-login failed - use quickLogin()');
+          toast('❌ Auto-login failed. Try: quickLogin()');
+        }
+      }, 100);
+    }
   })();
 
   const setStatus = (msg) => $('#status').textContent = msg || '';
@@ -246,35 +304,68 @@
   };
 
   function authHeaders(headers={}){
-    if(state.access){ 
-      headers['Authorization'] = `Bearer ${state.access}`;
-      console.log('Adding Authorization header with token:', state.access.substring(0, 20) + '...');
+    // Ensure we always start with proper headers
+    const baseHeaders = {
+      'Content-Type': 'application/json',
+      ...headers
+    };
+    
+    if(state.access && state.access.trim()){ 
+      baseHeaders['Authorization'] = `Bearer ${state.access}`;
+      console.log('🔑 Adding Authorization header with token:', state.access.substring(0, 20) + '...');
+      console.log('🔍 Full headers being sent:', baseHeaders);
     } else {
-      console.log('No access token available for Authorization header');
+      console.log('❌ No access token available for Authorization header');
+      console.log('🔍 Token in state:', state.access ? 'exists' : 'missing');
+      console.log('🔍 Token in localStorage:', localStorage.getItem('admin_access') ? 'exists' : 'missing');
     }
-    return headers;
+    return baseHeaders;
   }
 
   const get = async (url) => {
+    console.log('🌐 GET request to:', url);
+    console.log('🔍 Current API base:', state.apiBase);
+    console.log('🔍 Current access token:', state.access ? `${state.access.substring(0, 20)}...` : 'null');
+    
     setStatus('Loading...');
-    const res = await fetch(url, { headers: authHeaders(), credentials: 'omit' });
+    const headers = authHeaders();
+    console.log('🔍 Request headers:', headers);
+    
+    const res = await fetch(url, { 
+      headers,
+      credentials: 'omit',
+      method: 'GET'
+    });
+    
+    console.log('📡 Response status:', res.status);
+    console.log('📡 Response headers:', Object.fromEntries(res.headers.entries()));
+    
     setStatus('');
     if (res.status === 401 && state.refresh) {
+      console.log('🔄 Attempting token refresh...');
       // attempt refresh and retry once
       const refreshSuccess = await refreshToken();
       if (refreshSuccess) {
-        const retry = await fetch(url, { headers: authHeaders(), credentials: 'omit' });
+        console.log('✅ Token refresh successful, retrying request...');
+        const retryHeaders = authHeaders();
+        const retry = await fetch(url, { 
+          headers: retryHeaders, 
+          credentials: 'omit',
+          method: 'GET'
+        });
         if(!retry.ok) {
           const errorText = await retry.text();
           throw new Error(`HTTP ${retry.status}: ${errorText}`);
         }
         return await parseJsonSafely(retry);
       } else {
+        console.log('❌ Token refresh failed');
         throw new Error('Authentication failed. Please login again.');
       }
     }
     if (!res.ok) {
       const errorText = await res.text();
+      console.log('❌ Request failed:', res.status, errorText);
       throw new Error(`HTTP ${res.status}: ${errorText}`);
     }
     return await parseJsonSafely(res);

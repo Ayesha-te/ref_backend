@@ -1,13 +1,13 @@
 # PowerShell script to generate production earnings data
 try {
     Write-Host "🔑 Getting authentication token..."
-    $response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+    $response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
     $token = $response.access
     Write-Host "✅ Token obtained"
     
     Write-Host ""
     Write-Host "🚀 Generating bulk earnings data for all users..."
-    $bulkResult = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/bulk-generate/" -Method POST -Headers @{"Authorization"="Bearer $token"; "Content-Type"="application/json"} -Body '{"days": 25, "reset": true}'
+    $bulkResult = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/bulk-generate/" -Method POST -Headers @{"Authorization"="Bearer $token"; "Content-Type"="application/json"} -Body '{"days": 25, "reset": true}'
     
     if ($bulkResult.success) {
         Write-Host "✅ Bulk generation successful!"
@@ -18,7 +18,7 @@ try {
         Write-Host "📊 Checking updated user data..."
         Start-Sleep 3
         
-        $users = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
+        $users = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
         
         Write-Host "Users with passive earnings:"
         foreach ($user in $users.results) {
@@ -29,7 +29,7 @@ try {
         
         Write-Host ""
         Write-Host "🎉 SUCCESS! Check the admin panel:"
-        Write-Host "   https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com"
+        Write-Host "   https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com"
         Write-Host ""
         Write-Host "   Passive earnings should now show real amounts instead of `$0.00!"
         

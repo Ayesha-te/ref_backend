@@ -67,7 +67,7 @@
 
   async function detectApiBase(){
     // Prioritize production backend, then local development
-    const productionBackend = 'https://ref-backend-8arb.onrender.com/api';
+    const productionBackend = 'https://ref-backend-fw8y.onrender.com/api';
     const candidates = [
       productionBackend,  // Production backend (Render)
       'http://192.168.100.141:8000/api',  // Network IP
@@ -101,7 +101,7 @@
                         window.location.protocol === 'https:';
     
     // Try production backend first
-    const productionBase = 'https://ref-backend-8arb.onrender.com/api';
+    const productionBase = 'https://ref-backend-fw8y.onrender.com/api';
     console.log('Testing production backend:', productionBase);
     try {
       const testResponse = await fetch(`${productionBase}/auth/token/`, {

@@ -3,7 +3,7 @@
 
 try {
     Write-Host "🔑 Getting authentication token..."
-    $response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+    $response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
     $token = $response.access
     Write-Host "✅ Token obtained"
     
@@ -12,7 +12,7 @@ try {
     Write-Host "🚀 Generating more earnings data..."
     for ($i = 1; $i -le 15; $i++) {
         try {
-            $result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"} -ErrorAction SilentlyContinue
+            $result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"} -ErrorAction SilentlyContinue
             if ($i % 5 -eq 0) { Write-Host "Generated $i earnings..." }
         } catch {
             # Ignore errors for duplicate entries
@@ -24,7 +24,7 @@ try {
     
     # Check the API response with detailed debugging
     Write-Host "🔍 Checking API response structure..."
-    $users = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
+    $users = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
     
     $ahmad = $users.results | Where-Object { $_.username -eq "Ahmad" }
     if ($ahmad) {
@@ -56,7 +56,7 @@ try {
             Write-Host "✅ Earnings data exists in API!"
             Write-Host "🔧 The admin panel should check for 'passive_income_usd' or 'rewards_usd' fields"
             Write-Host ""
-            Write-Host "Admin panel URL: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com"
+            Write-Host "Admin panel URL: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com"
             Write-Host ""
             Write-Host "If still showing `$0, the admin panel frontend might be looking for a different field name."
         } else {
@@ -69,7 +69,7 @@ try {
 }
 
 Write-Host ""
-Write-Host "🔧 Manual verification steps:"
-Write-Host "1. Check if earnings exist: https://ref-backend-8arb.onrender.com/api/earnings/me/summary/"
-Write-Host "2. Admin users API: https://ref-backend-8arb.onrender.com/api/accounts/admin/users/"
-Write-Host "3. Generate earnings: POST https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/"
+Write-Host "🔧 Manual verification steps: https://ref-backend-fw8y.onrender.com"
+Write-Host "1. Check if earnings exist: /api/earnings/me/summary/"
+Write-Host "2. Admin users API: https://ref-backend-fw8y.onrender.com/api/accounts/admin/users/"
+Write-Host "3. Generate earnings: POST https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/"

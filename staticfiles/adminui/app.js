@@ -34,7 +34,7 @@
 
   async function detectApiBase(){
     // Prioritize production backend, then local development
-    const productionBackend = 'https://ref-backend-8arb.onrender.com/api';
+    const productionBackend = 'https://ref-backend-fw8y.onrender.com/api';
     const candidates = [
       productionBackend,  // Production backend (Render)
       'http://127.0.0.1:8000/api',  // Local Django server
@@ -67,7 +67,7 @@
                         window.location.protocol === 'https:';
     
     // Try production backend first
-    const productionBase = 'https://ref-backend-8arb.onrender.com/api';
+    const productionBase = 'https://ref-backend-fw8y.onrender.com/api';
     try {
       const testResponse = await fetch(`${productionBase}/auth/token/`, {
         method: 'POST',

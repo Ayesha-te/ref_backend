@@ -22,7 +22,7 @@ def sync_to_production():
     print("=" * 60)
     
     # Production API base
-    api_base = "https://ref-backend-8arb.onrender.com/api"
+    api_base = "https://ref-backend-fw8y.onrender.com/api"
     
     # First, try to login to get admin access
     try:
@@ -114,6 +114,6 @@ if __name__ == '__main__':
     success = sync_to_production()
     if success:
         print(f"\n📋 Sync completed. Check admin panel:")
-        print(f"   🌐 https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com")
+        print(f"   🌐 https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com")
     else:
         print(f"\n❌ Sync failed. Manual intervention may be required.")

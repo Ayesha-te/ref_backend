@@ -136,5 +136,5 @@ if __name__ == '__main__':
     import django.db.models
     created = bootstrap_production_earnings()
     print(f"\n📋 Production earnings data ready!")
-    print(f"   🌐 Admin Panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com")
+    print(f"   🌐 Admin Panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com")
     print(f"   🔑 Use admin/admin123 or any created user credentials")

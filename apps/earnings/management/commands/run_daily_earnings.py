@@ -3,10 +3,9 @@ from django.contrib.auth import get_user_model
 from apps.wallets.models import Wallet, Transaction, DepositRequest
 from apps.earnings.models import PassiveEarning
 from apps.earnings.services import compute_daily_earning_usd
-from apps.earnings.models_global_pool import GlobalPool, GlobalPoolPayout
+from apps.earnings.models_global_pool import GlobalPool
 from apps.referrals.services import record_direct_first_investment
 from decimal import Decimal
-from datetime import date
 
 class Command(BaseCommand):
     help = 'Compute daily passive earnings for all approved users who have invested (first credited deposit).'
@@ -45,7 +44,9 @@ class Command(BaseCommand):
             wallet.hold_usd = (Decimal(wallet.hold_usd) + metrics['platform_hold_usd']).quantize(Decimal('0.01'))
             wallet.save()
 
-
+            # accumulate global pool
+            pool.balance_usd = (Decimal(pool.balance_usd) + metrics['global_pool_usd']).quantize(Decimal('0.01'))
+            pool.save()
 
             Transaction.objects.create(
                 wallet=wallet,
@@ -55,70 +56,3 @@ class Command(BaseCommand):
             )
 
             self.stdout.write(self.style.SUCCESS(f"Credited {u.username} day {next_day}: {metrics['user_share_usd']} USD"))
-
-        # Monday global pool logic
-        today = date.today()
-        if today.weekday() == 0:  # Monday
-            # Collect 0.5 from users joined today
-            monday_joiners = User.objects.filter(date_joined__date=today, is_approved=True)
-            for user in monday_joiners:
-                wallet, _ = Wallet.objects.get_or_create(user=user)
-                if wallet.available_usd >= Decimal('0.5'):
-                    wallet.available_usd = (Decimal(wallet.available_usd) - Decimal('0.5')).quantize(Decimal('0.01'))
-                    wallet.save()
-                    pool.balance_usd = (Decimal(pool.balance_usd) + Decimal('0.5')).quantize(Decimal('0.01'))
-                    pool.save()
-                    Transaction.objects.create(
-                        wallet=wallet,
-                        type=Transaction.DEBIT,
-                        amount_usd=Decimal('0.5'),
-                        meta={'type': 'global_pool_contribution', 'date': str(today)}
-                    )
-                    self.stdout.write(self.style.SUCCESS(f"Collected 0.5 USD from {user.username} for global pool"))
-
-            # Distribute the pool
-            balance = Decimal(pool.balance_usd)
-            if balance > 0:
-                all_users = list(User.objects.filter(is_approved=True))
-                if all_users:
-                    per_user_gross = (balance / Decimal(len(all_users))).quantize(Decimal('0.01'))
-                    tax_rate = Decimal('0.20')
-                    tax_per_user = (per_user_gross * tax_rate).quantize(Decimal('0.01'))
-                    net_per_user = (per_user_gross - tax_per_user).quantize(Decimal('0.01'))
-
-                    for user in all_users:
-                        wallet, _ = Wallet.objects.get_or_create(user=user)
-                        wallet.available_usd = (Decimal(wallet.available_usd) + net_per_user).quantize(Decimal('0.01'))
-                        wallet.save()
-                        Transaction.objects.create(
-                            wallet=wallet,
-                            type=Transaction.CREDIT,
-                            amount_usd=net_per_user,
-                            meta={
-                                'type': 'global_pool_payout',
-                                'gross_usd': str(per_user_gross),
-                                'tax_usd': str(tax_per_user),
-                                'net_usd': str(net_per_user),
-                                'total_users': len(all_users),
-                                'total_pool_usd': str(balance),
-                                'date': str(today)
-                            }
-                        )
-
-                    # Record payout
-                    GlobalPoolPayout.objects.create(
-                        amount_usd=balance,
-                        meta={
-                            'count': len(all_users),
-                            'per_user_gross': str(per_user_gross),
-                            'per_user_net': str(net_per_user),
-                            'tax_rate': str(tax_rate),
-                            'date': str(today)
-                        }
-                    )
-                    pool.balance_usd = Decimal('0.00')
-                    pool.save()
-                    self.stdout.write(self.style.SUCCESS(
-                        f'Distributed {balance} USD to {len(all_users)} users '
-                        f'(gross: {per_user_gross} USD, net after 20% tax: {net_per_user} USD each)'
-                    ))

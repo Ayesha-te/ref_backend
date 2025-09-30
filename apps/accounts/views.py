@@ -318,9 +318,6 @@ class AdminUsersListView(generics.GenericAPIView):
             except:
                 current_balance_usd = '0.00'
             
-            # Ensure both field names for compatibility
-            passive_earnings_amount = str(getattr(u, 'passive_income_usd', 0) or 0)
-            
             data.append({
                 'id': u.id,
                 'username': u.username,
@@ -333,8 +330,7 @@ class AdminUsersListView(generics.GenericAPIView):
                 'date_joined': u.date_joined,
                 'last_login': u.last_login,
                 'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
-                'passive_income_usd': passive_earnings_amount,
-                'total_passive_earnings': passive_earnings_amount,  # For admin panel compatibility
+                'passive_income_usd': str(getattr(u, 'passive_income_usd', 0) or 0),
                 'current_balance_usd': current_balance_usd,
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',

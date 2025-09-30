@@ -69,6 +69,10 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         tax = apply_withdraw_tax(amount_usd)
         net_usd = tax['net_usd']
 
+        # Hold funds while pending
+        wallet.available_usd = (Decimal(wallet.available_usd) - amount_usd).quantize(Decimal('0.01'))
+        wallet.save()
+
         # Default method/account_details if frontend omits them
         method = self.request.data.get('method') or 'BANK'
         account_details = self.request.data.get('account_details') or {}
@@ -112,14 +116,14 @@ def admin_withdraw_action(request, pk):
     wr = WithdrawalRequest.objects.get(pk=pk)
 
     if action == 'REJECT':
+        # refund to wallet
+        wallet = wr.user.wallet
+        wallet.available_usd = (Decimal(wallet.available_usd) + wr.amount_usd).quantize(Decimal('0.01'))
+        wallet.save()
         wr.status = 'REJECTED'
         wr.processed_at = timezone.now()
         wr.save()
     elif action == 'APPROVE':
-        # deduct funds on approval
-        wallet = wr.user.wallet
-        wallet.available_usd = (Decimal(wallet.available_usd) - wr.amount_usd).quantize(Decimal('0.01'))
-        wallet.save()
         wr.status = 'APPROVED'
         wr.processed_at = timezone.now()
         wr.save()

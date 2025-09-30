@@ -75,7 +75,7 @@ def main():
     
     print("\n✅ Manual generation complete!")
     print("📋 Next steps:")
-    print("1. Check admin panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com")
+    print("1. Check admin panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com")
     print("2. API should now return non-zero values for passive_income_usd")
     print("3. If still showing $0, check frontend field mapping")
 

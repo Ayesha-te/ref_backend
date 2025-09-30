@@ -202,11 +202,8 @@ ADMIN_USD_TO_PKR = float(os.environ.get('ADMIN_USD_TO_PKR', '280.0'))
 # Signup payment base in PKR
 SIGNUP_FEE_PKR = float(os.environ.get('SIGNUP_FEE_PKR', '1410'))
 
-# Cron jobs for automated tasks
+# Weekly cron for global pool distribution (every Monday at 00:00 UTC)
 CRONJOBS = [
-    # Daily earnings generation (every day at 00:01 UTC)
-    ('1 0 * * *', 'django.core.management.call_command', ['run_daily_earnings']),
-    # Weekly global pool distribution (every Monday at 00:00 UTC)
     ('0 0 * * 1', 'django.core.management.call_command', ['distribute_global_pool']),
 ]
 
@@ -250,31 +247,5 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
-        'apps.earnings.scheduler': {
-            'handlers': ['console'],
-            'level': 'INFO',
-            'propagate': False,
-        },
     },
 }
-
-# =============================================================================
-# AUTOMATION SETTINGS
-# =============================================================================
-
-# Automatically enable scheduler in production (when DEBUG=False)
-# Can be overridden with ENABLE_SCHEDULER environment variable
-ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', str(not DEBUG)).lower() == 'true'
-
-# Scheduler configuration
-SCHEDULER_CONFIG = {
-    'DAILY_EARNINGS_HOUR': int(os.environ.get('DAILY_EARNINGS_HOUR', '0')),  # Default: midnight UTC
-    'DAILY_EARNINGS_MINUTE': int(os.environ.get('DAILY_EARNINGS_MINUTE', '1')),  # Default: 00:01 UTC
-    'HEARTBEAT_INTERVAL': int(os.environ.get('HEARTBEAT_INTERVAL', '3600')),  # Default: every hour
-}
-
-print(f"🔧 Automation enabled: {ENABLE_SCHEDULER}")
-print(f"🔧 Debug mode: {DEBUG}")
-print(f"🔧 Production mode: {not DEBUG}")
-if ENABLE_SCHEDULER:
-    print(f"⏰ Daily earnings scheduled for {SCHEDULER_CONFIG['DAILY_EARNINGS_HOUR']:02d}:{SCHEDULER_CONFIG['DAILY_EARNINGS_MINUTE']:02d} UTC")

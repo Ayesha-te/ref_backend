@@ -9,17 +9,17 @@ backlog = 2048
 
 # Worker processes
 # Keep worker count low to avoid exceeding Neon's connection limit (~50 pooled connections)
-workers = int(os.environ.get('GUNICORN_WORKERS', '2'))
+workers = min(3, int(os.environ.get('GUNICORN_WORKERS', '2')))  # Limit for free tier
 worker_class = "sync"  # Use sync workers instead of async to avoid connection leaks
 worker_connections = 1000
-max_requests = 200  # Restart workers after 200 requests to prevent memory leaks
+max_requests = 1000  # Restart workers after 1000 requests to prevent memory leaks
 max_requests_jitter = 50  # Add randomness to prevent all workers restarting at once
 
 # Threading
 threads = int(os.environ.get('GUNICORN_THREADS', '4'))
 
-# Timeout
-timeout = 30
+# Timeout - increased for Render stability
+timeout = 120  # Increased timeout for slow queries and Render health checks
 keepalive = 2
 
 # Logging

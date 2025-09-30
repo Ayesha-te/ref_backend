@@ -4,7 +4,7 @@ from rest_framework import views, permissions
 from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.conf import settings
-from apps.wallets.models import Wallet
+from apps.wallets.models import Wallet, Transaction
 from .models import PassiveEarning
 from .models_global_pool import GlobalPool, GlobalPoolPayout
 
@@ -14,13 +14,20 @@ class MyEarningsSummary(views.APIView):
 
     def get(self, request):
         wallet, _ = Wallet.objects.get_or_create(user=request.user)
-        total_gross = sum(e.amount_usd for e in PassiveEarning.objects.filter(user=request.user))
-        total_count = PassiveEarning.objects.filter(user=request.user).count()
+        
+        # Calculate real passive income from transactions instead of dummy PassiveEarning records
+        passive_transactions = Transaction.objects.filter(
+            wallet=wallet,
+            meta__type='passive'
+        )
+        total_gross = sum(Decimal(str(t.amount_usd)) for t in passive_transactions)
+        total_count = passive_transactions.count()
+        
         return Response({
             'available_usd': wallet.available_usd,
             'hold_usd': wallet.hold_usd,
             'entries': total_count,
-            'total_credited_usd': total_gross,
+            'total_credited_usd': str(total_gross.quantize(Decimal('0.01'))),
         })
 
 
@@ -31,12 +38,34 @@ class AdminGlobalPoolView(views.APIView):
         # Pool balance and last payout
         pool = GlobalPool.objects.first()
         last_payout = GlobalPoolPayout.objects.order_by('-distributed_on').first()
-        # Top passive earners and per-user passive totals
-        per_user = (
-            PassiveEarning.objects.values('user__id', 'user__username')
-            .annotate(total_passive=Sum('amount_usd'))
-            .order_by('-total_passive')[:50]
-        )
+        
+        # Top passive earners using real transaction data instead of dummy PassiveEarning records
+        User = get_user_model()
+        per_user_data = []
+        
+        # Get all users and calculate their real passive income from transactions
+        users = User.objects.filter(is_approved=True).order_by('username')
+        for user in users:
+            # Calculate real passive income from transactions with meta.type = 'passive'
+            passive_transactions = Transaction.objects.filter(
+                wallet__user=user,
+                meta__type='passive'
+            )
+            total_passive = sum(
+                Decimal(str(t.amount_usd)) for t in passive_transactions
+            )
+            
+            if total_passive > 0:  # Only include users with passive income
+                per_user_data.append({
+                    'user_id': user.id,
+                    'username': user.username,
+                    'total_passive_usd': str(total_passive.quantize(Decimal('0.01'))),
+                })
+        
+        # Sort by total passive income (highest first) and limit to top 50
+        per_user_data.sort(key=lambda x: Decimal(x['total_passive_usd']), reverse=True)
+        per_user_data = per_user_data[:50]
+        
         return Response({
             'payout_day': 'Monday',
             'pool_balance_usd': str(pool.balance_usd if pool else Decimal('0.00')),
@@ -45,14 +74,7 @@ class AdminGlobalPoolView(views.APIView):
                 'distributed_on': last_payout.distributed_on if last_payout else None,
                 'meta': last_payout.meta if last_payout else None,
             },
-            'per_user_passive': [
-                {
-                    'user_id': row['user__id'],
-                    'username': row['user__username'],
-                    'total_passive_usd': str(row['total_passive'] or Decimal('0.00')),
-                }
-                for row in per_user
-            ],
+            'per_user_passive': per_user_data,
         })
 
 

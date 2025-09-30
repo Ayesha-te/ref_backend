@@ -44,9 +44,7 @@ class Command(BaseCommand):
             wallet.hold_usd = (Decimal(wallet.hold_usd) + metrics['platform_hold_usd']).quantize(Decimal('0.01'))
             wallet.save()
 
-            # accumulate global pool
-            pool.balance_usd = (Decimal(pool.balance_usd) + metrics['global_pool_usd']).quantize(Decimal('0.01'))
-            pool.save()
+            # NO global pool contribution from daily earnings - only Monday joiners contribute
 
             Transaction.objects.create(
                 wallet=wallet,

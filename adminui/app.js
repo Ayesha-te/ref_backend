@@ -298,14 +298,20 @@
           credentials: 'omit',
           body: JSON.stringify(body||{})
         });
-        if(!retry.ok) throw new Error(await retry.text());
-        return retry.json().catch(()=>({ ok:true }));
+        if(!retry.ok) {
+          const errorText = await retry.text();
+          throw new Error(`HTTP ${retry.status}: ${errorText}`);
+        }
+        return await parseJsonSafely(retry);
       } else {
         throw new Error('Authentication failed. Please login again.');
       }
     }
-    if (!res.ok) throw new Error(await res.text());
-    return res.json().catch(()=>({ ok:true }));
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+    return await parseJsonSafely(res);
   };
 
   const patch = async (url, body) => {
@@ -326,14 +332,20 @@
           credentials: 'omit',
           body: JSON.stringify(body||{})
         });
-        if(!retry.ok) throw new Error(await retry.text());
-        return retry.json().catch(()=>({ ok:true }));
+        if(!retry.ok) {
+          const errorText = await retry.text();
+          throw new Error(`HTTP ${retry.status}: ${errorText}`);
+        }
+        return await parseJsonSafely(retry);
       } else {
         throw new Error('Authentication failed. Please login again.');
       }
     }
-    if (!res.ok) throw new Error(await res.text());
-    return res.json().catch(()=>({ ok:true }));
+    if (!res.ok) {
+      const errorText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errorText}`);
+    }
+    return await parseJsonSafely(res);
   };
 
   async function login(username, password){
@@ -346,11 +358,19 @@
     console.log('Login response status:', res.status);
     if(!res.ok){
       let detail = 'Login failed';
-      try { const data = await res.json(); detail = data?.detail || detail; console.log('Login error data:', data); } catch(_){ try{ detail = await res.text() || detail; console.log('Login error text:', detail); }catch(__){}
+      try { 
+        const data = await parseJsonSafely(res); 
+        detail = data?.detail || detail; 
+        console.log('Login error data:', data); 
+      } catch(_){ 
+        try{ 
+          detail = await res.text() || detail; 
+          console.log('Login error text:', detail); 
+        }catch(__){} 
       }
       throw new Error(`[${res.status}] ${detail}`);
     }
-    const data = await res.json();
+    const data = await parseJsonSafely(res);
     state.access = data.access; state.refresh = data.refresh;
     try {
       localStorage.setItem('admin_access', state.access || '');
@@ -381,7 +401,7 @@
         return false;
       }
       
-      const data = await res.json();
+      const data = await parseJsonSafely(res);
       state.access = data.access;
       if (data.refresh) { 
         state.refresh = data.refresh; 
@@ -483,6 +503,24 @@
   // Enhanced error handling for API responses
   function handleApiError(error, url) {
     console.error('API Error:', error);
+    
+    // Check for HTML response errors (the main issue we're fixing)
+    if (error.message.includes('Server returned HTML instead of JSON')) {
+      setAuthStatus(false, 'Auth failed');
+      toast('❌ Authentication error. Please login again.');
+      setStatus('Server returned HTML error page - likely authentication issue');
+      logout();
+      return;
+    }
+    
+    // Check for HTTP 401 errors
+    if (error.message.includes('HTTP 401')) {
+      setAuthStatus(false, 'Unauthorized');
+      toast('❌ Unauthorized. Please login again.');
+      setStatus('401 Unauthorized - invalid or missing credentials');
+      logout();
+      return;
+    }
     
     // Check for CORS errors
     if (error.message.includes('Failed to fetch') || error.name === 'TypeError') {

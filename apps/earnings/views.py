@@ -166,7 +166,15 @@ def bulk_generate_earnings_api(request):
             PassiveEarning.objects.all().delete()
         
         User = get_user_model()
-        users = User.objects.all()
+        # Only generate earnings for users who have made investments (excluding signup initial)
+        from apps.wallets.models import DepositRequest
+        eligible_users = []
+        for u in User.objects.filter(is_approved=True):
+            first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').first()
+            if first_dep:
+                eligible_users.append(u)
+        
+        users = eligible_users
         total_created = 0
         
         for user in users:

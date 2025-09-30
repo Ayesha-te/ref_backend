@@ -318,8 +318,16 @@ class AdminUsersListView(generics.GenericAPIView):
             except:
                 current_balance_usd = '0.00'
             
-            # Ensure both field names for compatibility
-            passive_earnings_amount = str(getattr(u, 'passive_income_usd', 0) or 0)
+            # Only show passive income for users who have made actual investments (excluding signup initial)
+            has_investment = DepositRequest.objects.filter(
+                user=u, 
+                status='CREDITED'
+            ).exclude(tx_id='SIGNUP-INIT').exists()
+            
+            if has_investment:
+                passive_earnings_amount = str(getattr(u, 'passive_income_usd', 0) or 0)
+            else:
+                passive_earnings_amount = '0.00'
             
             data.append({
                 'id': u.id,

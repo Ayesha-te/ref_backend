@@ -15,12 +15,17 @@ class Command(BaseCommand):
         User = get_user_model()
         users = User.objects.filter(is_approved=True)
         pool, _ = GlobalPool.objects.get_or_create(pk=1)
+        
+        # Only process users who have made actual investments (excluding signup initial deposit)
+        eligible_users = []
         for u in users:
             # Only start passive earnings after first credited deposit (exclude signup initial)
             # Detect first credited investment (excluding signup init); if present and not yet recorded to referrer milestone, record it once.
             first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').order_by('processed_at', 'created_at').first()
             if not first_dep:
                 continue
+            eligible_users.append(u)
+            
             # Link to referrer milestone once per user: use a transaction meta flag to ensure idempotence.
             wallet, _ = Wallet.objects.get_or_create(user=u)
             flag_key = f"first_investment_recorded:{u.id}"
@@ -45,8 +50,6 @@ class Command(BaseCommand):
             wallet.hold_usd = (Decimal(wallet.hold_usd) + metrics['platform_hold_usd']).quantize(Decimal('0.01'))
             wallet.save()
 
-
-
             Transaction.objects.create(
                 wallet=wallet,
                 type=Transaction.CREDIT,
@@ -59,7 +62,7 @@ class Command(BaseCommand):
         # Monday global pool logic
         today = date.today()
         if today.weekday() == 0:  # Monday
-            # Collect 0.5 from users joined today
+            # Collect 0.5 from users joined today (only from Monday joiners)
             monday_joiners = User.objects.filter(date_joined__date=today, is_approved=True)
             for user in monday_joiners:
                 wallet, _ = Wallet.objects.get_or_create(user=user)
@@ -76,17 +79,19 @@ class Command(BaseCommand):
                     )
                     self.stdout.write(self.style.SUCCESS(f"Collected 0.5 USD from {user.username} for global pool"))
 
-            # Distribute the pool
+            # Distribute the pool to all approved users (who have signed up)
             balance = Decimal(pool.balance_usd)
             if balance > 0:
-                all_users = list(User.objects.filter(is_approved=True))
-                if all_users:
-                    per_user_gross = (balance / Decimal(len(all_users))).quantize(Decimal('0.01'))
+                # Get all approved users for global pool distribution
+                distribution_users = list(User.objects.filter(is_approved=True))
+                
+                if distribution_users:
+                    per_user_gross = (balance / Decimal(len(distribution_users))).quantize(Decimal('0.01'))
                     tax_rate = Decimal('0.20')
                     tax_per_user = (per_user_gross * tax_rate).quantize(Decimal('0.01'))
                     net_per_user = (per_user_gross - tax_per_user).quantize(Decimal('0.01'))
 
-                    for user in all_users:
+                    for user in distribution_users:
                         wallet, _ = Wallet.objects.get_or_create(user=user)
                         wallet.available_usd = (Decimal(wallet.available_usd) + net_per_user).quantize(Decimal('0.01'))
                         wallet.save()
@@ -99,7 +104,7 @@ class Command(BaseCommand):
                                 'gross_usd': str(per_user_gross),
                                 'tax_usd': str(tax_per_user),
                                 'net_usd': str(net_per_user),
-                                'total_users': len(all_users),
+                                'total_users': len(distribution_users),
                                 'total_pool_usd': str(balance),
                                 'date': str(today)
                             }
@@ -109,16 +114,21 @@ class Command(BaseCommand):
                     GlobalPoolPayout.objects.create(
                         amount_usd=balance,
                         meta={
-                            'count': len(all_users),
+                            'count': len(distribution_users),
                             'per_user_gross': str(per_user_gross),
                             'per_user_net': str(net_per_user),
                             'tax_rate': str(tax_rate),
-                            'date': str(today)
+                            'date': str(today),
+                            'eligible_criteria': 'all_approved_users'
                         }
                     )
                     pool.balance_usd = Decimal('0.00')
                     pool.save()
                     self.stdout.write(self.style.SUCCESS(
-                        f'Distributed {balance} USD to {len(all_users)} users '
+                        f'Distributed {balance} USD to {len(distribution_users)} approved users '
                         f'(gross: {per_user_gross} USD, net after 20% tax: {net_per_user} USD each)'
+                    ))
+                else:
+                    self.stdout.write(self.style.WARNING(
+                        f'No approved users for global pool distribution (balance: {balance} USD)'
                     ))

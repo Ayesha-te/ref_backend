@@ -1,13 +1,20 @@
 ﻿from django.contrib.auth import get_user_model
 from apps.earnings.models import PassiveEarning
+from apps.wallets.models import DepositRequest
 from decimal import Decimal
 import random
 
 User = get_user_model()
 
-# Get all users
-users = User.objects.all()
-print(f"Found {users.count()} users")
+# Only get users who have made investments (excluding signup initial)
+eligible_users = []
+for u in User.objects.filter(is_approved=True):
+    first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').first()
+    if first_dep:
+        eligible_users.append(u)
+
+users = eligible_users
+print(f"Found {len(users)} eligible users (with investments)")
 
 for user in users:
     print(f"Generating earnings for {user.username}...")
@@ -35,6 +42,7 @@ for user in users:
             print(f"  Day {day}: ${amount} ({percent*100}%)")
     
     # Check total
+    from django.db import models
     total = user.passive_earnings.aggregate(total=models.Sum('amount_usd'))['total'] or Decimal('0')
     print(f"  Total for {user.username}: ${total}")
     print()

@@ -326,12 +326,14 @@ class AdminUsersListView(generics.GenericAPIView):
 
         data = []
         for u in page_qs:
-            # Get current wallet balance
+            # Get wallet balances - use income_usd for withdrawable earnings
             try:
                 wallet = u.wallet
-                current_balance_usd = str(wallet.available_usd)
+                current_balance_usd = str(wallet.income_usd)  # Withdrawable earnings (passive + referral + milestone - withdrawals)
+                available_balance_usd = str(wallet.available_usd)  # Deposit principal (80% of deposits)
             except:
                 current_balance_usd = '0.00'
+                available_balance_usd = '0.00'
             
             # Use transaction-based passive income as the primary value (real data)
             real_passive_income = str(getattr(u, 'passive_income_from_transactions', 0) or 0)
@@ -351,7 +353,8 @@ class AdminUsersListView(generics.GenericAPIView):
                 'rewards_usd': real_passive_income,  # Use real transaction-based data
                 'passive_income_usd': real_passive_income,  # Use real transaction-based data
                 'passive_income_from_model': dummy_passive_income,  # For debugging/comparison
-                'current_balance_usd': current_balance_usd,
+                'current_balance_usd': current_balance_usd,  # Withdrawable income (income_usd)
+                'available_balance_usd': available_balance_usd,  # Deposit principal (available_usd)
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',
                 'referrals_count': getattr(u, 'referrals_count', 0) or 0,

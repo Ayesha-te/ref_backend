@@ -5,7 +5,7 @@ from .models import Wallet, Transaction, DepositRequest
 
 @admin.register(Wallet)
 class WalletAdmin(admin.ModelAdmin):
-    list_display = ("user", "available_usd", "hold_usd")
+    list_display = ("user", "available_usd", "income_usd", "hold_usd")
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):

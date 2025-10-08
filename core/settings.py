@@ -130,7 +130,8 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
-    "https://adminui-oe7i.vercel.app",
+    "https://adminui-oe7i.vercel.app",  # Old admin UI
+    "https://adminui-etbh.vercel.app",  # Current admin UI
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",

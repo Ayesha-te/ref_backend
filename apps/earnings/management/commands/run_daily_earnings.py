@@ -101,11 +101,13 @@ class Command(BaseCommand):
                         amount_usd=metrics['user_share_usd'],
                     )
                     
-                    # Credit user share
-                    wallet.available_usd = (Decimal(wallet.available_usd) + metrics['user_share_usd']).quantize(Decimal('0.01'))
+                    # Add passive earnings to income_usd (withdrawable income)
+                    # DO NOT add to available_usd (which is only for 80% of deposits)
+                    wallet.income_usd = (Decimal(wallet.income_usd) + metrics['user_share_usd']).quantize(Decimal('0.01'))
                     wallet.hold_usd = (Decimal(wallet.hold_usd) + metrics['platform_hold_usd']).quantize(Decimal('0.01'))
                     wallet.save()
 
+                    # Create transaction record for passive income display
                     Transaction.objects.create(
                         wallet=wallet,
                         type=Transaction.CREDIT,

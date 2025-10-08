@@ -48,7 +48,7 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
 
         # Check if user has minimum income requirement (5000 PKR total)
         wallet, _ = Wallet.objects.get_or_create(user=self.request.user)
-        total_income_usd = wallet.available_usd + wallet.hold_usd
+        total_income_usd = wallet.income_usd  # Only withdrawable income
         total_income_pkr = total_income_usd * get_fx_rate()
         
         if total_income_pkr < Decimal('5000'):
@@ -62,15 +62,15 @@ class MyWithdrawalsView(generics.ListCreateAPIView):
         except (InvalidOperation, ZeroDivisionError):
             raise ValidationError({"detail": ["Invalid FX rate configuration."]})
 
-        # Wallet balance check (only check available balance, not minimum withdrawal amount)
-        if amount_usd > wallet.available_usd:
-            raise ValidationError({"detail": ["Insufficient balance."]})
+        # Wallet balance check - check income_usd (withdrawable income)
+        if amount_usd > wallet.income_usd:
+            raise ValidationError({"detail": ["Insufficient income balance."]})
 
         tax = apply_withdraw_tax(amount_usd)
         net_usd = tax['net_usd']
 
-        # Hold funds while pending
-        wallet.available_usd = (Decimal(wallet.available_usd) - amount_usd).quantize(Decimal('0.01'))
+        # Deduct from income while pending
+        wallet.income_usd = (Decimal(wallet.income_usd) - amount_usd).quantize(Decimal('0.01'))
         wallet.save()
 
         # Default method/account_details if frontend omits them
@@ -116,9 +116,9 @@ def admin_withdraw_action(request, pk):
     wr = WithdrawalRequest.objects.get(pk=pk)
 
     if action == 'REJECT':
-        # refund to wallet
+        # refund to income wallet
         wallet = wr.user.wallet
-        wallet.available_usd = (Decimal(wallet.available_usd) + wr.amount_usd).quantize(Decimal('0.01'))
+        wallet.income_usd = (Decimal(wallet.income_usd) + wr.amount_usd).quantize(Decimal('0.01'))
         wallet.save()
         wr.status = 'REJECTED'
         wr.processed_at = timezone.now()

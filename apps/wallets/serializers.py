@@ -4,7 +4,7 @@ from .models import Wallet, Transaction, DepositRequest
 class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
-        fields = ["available_usd", "hold_usd"]
+        fields = ["available_usd", "hold_usd", "income_usd"]
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:

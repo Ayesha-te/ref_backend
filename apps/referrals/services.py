@@ -18,7 +18,9 @@ User = get_user_model()
 
 
 def _credit(wallet: Wallet, amount: Decimal, meta: dict):
-    wallet.available_usd = (Decimal(wallet.available_usd) + amount).quantize(Decimal('0.01'))
+    # Add to income_usd (withdrawable income)
+    # DO NOT add to available_usd (which is only for 80% of deposits)
+    wallet.income_usd = (Decimal(wallet.income_usd) + amount).quantize(Decimal('0.01'))
     wallet.save()
     Transaction.objects.create(wallet=wallet, type=Transaction.CREDIT, amount_usd=amount, meta=meta)
 

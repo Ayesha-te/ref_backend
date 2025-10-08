@@ -4,6 +4,7 @@ from django.conf import settings
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.accounts.views import TokenObtainPairPatchedView
+from apps.accounts.bootstrap_views import bootstrap_production_earnings
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -15,6 +16,8 @@ urlpatterns = [
     path('api/referrals/', include('apps.referrals.urls')),
     path('api/withdrawals/', include('apps.withdrawals.urls')),
     path('api/marketplace/', include('apps.marketplace.urls')),
+    # Bootstrap endpoint for free tier deployment
+    path('api/bootstrap-earnings/', bootstrap_production_earnings, name='bootstrap_earnings'),
 ]
 
 # Serve media files (including in production)

@@ -318,6 +318,17 @@ class AdminUsersListView(generics.GenericAPIView):
             except:
                 current_balance_usd = '0.00'
             
+            # Only show passive income for users who have made actual investments (excluding signup initial)
+            has_investment = DepositRequest.objects.filter(
+                user=u, 
+                status='CREDITED'
+            ).exclude(tx_id='SIGNUP-INIT').exists()
+            
+            if has_investment:
+                passive_earnings_amount = str(getattr(u, 'passive_income_usd', 0) or 0)
+            else:
+                passive_earnings_amount = '0.00'
+            
             data.append({
                 'id': u.id,
                 'username': u.username,
@@ -330,7 +341,8 @@ class AdminUsersListView(generics.GenericAPIView):
                 'date_joined': u.date_joined,
                 'last_login': u.last_login,
                 'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
-                'passive_income_usd': str(getattr(u, 'passive_income_usd', 0) or 0),
+                'passive_income_usd': passive_earnings_amount,
+                'total_passive_earnings': passive_earnings_amount,  # For admin panel compatibility
                 'current_balance_usd': current_balance_usd,
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',

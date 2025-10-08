@@ -9,9 +9,30 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         User = get_user_model()
-        users = list(User.objects.filter(is_approved=True))
+        
+        # Get users who are eligible for global pool distribution
+        # 1. Users with investments (have credited deposits excluding signup initial)
+        from apps.wallets.models import DepositRequest
+        users_with_investments = []
+        for u in User.objects.filter(is_approved=True):
+            first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').first()
+            if first_dep:
+                users_with_investments.append(u)
+        
+        # 2. Users with referrals (even if they haven't invested themselves)
+        from apps.referrals.models import Referral
+        users_with_referrals = User.objects.filter(
+            is_approved=True,
+            referrals_made__isnull=False
+        ).distinct()
+        
+        # Combine both groups and remove duplicates
+        distribution_users = set(users_with_investments)
+        distribution_users.update(users_with_referrals)
+        users = list(distribution_users)
+        
         if not users:
-            self.stdout.write('No approved users to distribute to.')
+            self.stdout.write('No eligible users to distribute to (no investments or referrals).')
             return
         
         pool, _ = GlobalPool.objects.get_or_create(pk=1)
@@ -62,6 +83,7 @@ class Command(BaseCommand):
                 'per_user_net': str(net_per_user),
                 'tax_rate': str(withdrawal_tax_rate),
                 'distributed_count': distributed_count,
+                'eligible_criteria': 'users_with_investments_or_referrals'
             }
         )
         pool.balance_usd = Decimal('0.00')

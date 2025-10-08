@@ -326,14 +326,18 @@ class AdminUsersListView(generics.GenericAPIView):
 
         data = []
         for u in page_qs:
-            # Get wallet balances - use income_usd for withdrawable earnings
+            # Get wallet and calculate current income (passive + referral + milestone + global pool)
             try:
                 wallet = u.wallet
-                current_balance_usd = str(wallet.income_usd)  # Withdrawable earnings (passive + referral + milestone - withdrawals)
-                available_balance_usd = str(wallet.available_usd)  # Deposit principal (80% of deposits)
+                current_balance_usd = str(wallet.available_usd)
+                # Calculate current income from wallet method (includes all income types)
+                current_income_usd = str(wallet.get_current_income_usd())
+                # Also get the stored income_usd field
+                stored_income_usd = str(wallet.income_usd)
             except:
                 current_balance_usd = '0.00'
-                available_balance_usd = '0.00'
+                current_income_usd = '0.00'
+                stored_income_usd = '0.00'
             
             # Use transaction-based passive income as the primary value (real data)
             real_passive_income = str(getattr(u, 'passive_income_from_transactions', 0) or 0)
@@ -353,8 +357,9 @@ class AdminUsersListView(generics.GenericAPIView):
                 'rewards_usd': real_passive_income,  # Use real transaction-based data
                 'passive_income_usd': real_passive_income,  # Use real transaction-based data
                 'passive_income_from_model': dummy_passive_income,  # For debugging/comparison
-                'current_balance_usd': current_balance_usd,  # Withdrawable income (income_usd)
-                'available_balance_usd': available_balance_usd,  # Deposit principal (available_usd)
+                'current_balance_usd': current_balance_usd,  # Available balance (deposits only)
+                'current_income_usd': current_income_usd,  # Total income (passive + referral + milestone + global pool)
+                'stored_income_usd': stored_income_usd,  # Stored income_usd field (for comparison)
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',
                 'referrals_count': getattr(u, 'referrals_count', 0) or 0,

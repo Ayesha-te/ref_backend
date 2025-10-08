@@ -2,9 +2,28 @@ from rest_framework import serializers
 from .models import Wallet, Transaction, DepositRequest
 
 class WalletSerializer(serializers.ModelSerializer):
+    current_income_usd = serializers.SerializerMethodField()
+    passive_earnings_usd = serializers.SerializerMethodField()
+    
     class Meta:
         model = Wallet
-        fields = ["available_usd", "hold_usd", "income_usd"]
+        fields = ["available_usd", "hold_usd", "income_usd", "current_income_usd", "passive_earnings_usd"]
+    
+    def get_current_income_usd(self, obj):
+        """Return calculated current income from all sources (passive + referral + milestone + global pool)"""
+        return float(obj.get_current_income_usd())
+    
+    def get_passive_earnings_usd(self, obj):
+        """Return only passive earnings"""
+        from django.db.models import Sum
+        from decimal import Decimal
+        
+        passive_total = obj.transactions.filter(
+            type=Transaction.CREDIT,
+            meta__type='passive'
+        ).aggregate(total=Sum('amount_usd'))['total'] or Decimal('0')
+        
+        return float(passive_total)
 
 class TransactionSerializer(serializers.ModelSerializer):
     class Meta:

@@ -9,16 +9,17 @@ class Wallet(models.Model):
     income_usd = models.DecimalField(max_digits=12, decimal_places=2, default=0)  # Withdrawable income (passive + referral + milestone)
     
     def get_current_income_usd(self):
-        """Calculate total current income from transactions (passive + referral + milestone)"""
+        """Calculate total current income from transactions (passive + referral + milestone + global pool)"""
         from django.db.models import Sum, Q
         
-        # Sum all income credits (passive, referral, milestone)
+        # Sum all income credits (passive, referral, milestone, global_pool)
         income_credits = self.transactions.filter(
             type=Transaction.CREDIT
         ).filter(
             Q(meta__type='passive') | 
             Q(meta__type='referral') | 
-            Q(meta__type='milestone')
+            Q(meta__type='milestone') |
+            Q(meta__type='global_pool')
         ).exclude(
             meta__source='signup-initial'
         ).exclude(

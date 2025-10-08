@@ -49,7 +49,6 @@ class MyDepositsView(generics.ListCreateAPIView):
             raise ValidationError({"amount_pkr": ["Invalid decimal amount."]})
         if amount_pkr <= 0:
             raise ValidationError({"amount_pkr": ["Must be greater than 0."]})
-        # Removed minimum deposit amount validation - users can add any amount
 
         tx_id = self.request.data.get('tx_id')
         bank_name = self.request.data.get('bank_name', '')
@@ -91,19 +90,25 @@ def admin_deposit_action(request, pk):
         dr.processed_at = timezone.now()
         dr.save()
     elif action == 'CREDIT':
-        # Apply economics: split deposit into user available share and platform hold
-        # NO global pool contribution from regular deposits - only Monday joiners contribute
+        # Apply economics: split deposit into user available share, platform hold, and global pool
+        from apps.earnings.models_global_pool import GlobalPool
         from django.conf import settings as dj_settings
         from apps.referrals.services import pay_on_first_investment
         wallet, _ = Wallet.objects.get_or_create(user=dr.user)
         user_share_rate = Decimal(str(dj_settings.ECONOMICS['USER_WALLET_SHARE']))
-        
+        global_pool_rate = Decimal(str(dj_settings.ECONOMICS['GLOBAL_POOL_CUT']))
         user_share = (dr.amount_usd * user_share_rate).quantize(Decimal('0.01'))
         platform_hold = (dr.amount_usd - user_share).quantize(Decimal('0.01'))
+        global_pool = (dr.amount_usd * global_pool_rate).quantize(Decimal('0.01'))
 
         wallet.available_usd = (Decimal(wallet.available_usd) + user_share).quantize(Decimal('0.01'))
         wallet.hold_usd = (Decimal(wallet.hold_usd) + platform_hold).quantize(Decimal('0.01'))
         wallet.save()
+
+        # Track pool balance
+        gp = GlobalPool.objects.first() or GlobalPool.objects.create()
+        gp.balance_usd = (Decimal(gp.balance_usd) + global_pool).quantize(Decimal('0.01'))
+        gp.save()
 
         # Record full deposit in transactions with breakdown
         Transaction.objects.create(
@@ -116,7 +121,7 @@ def admin_deposit_action(request, pk):
                 'tx_id': dr.tx_id,
                 'user_share_usd': str(user_share),
                 'platform_hold_usd': str(platform_hold),
-                'global_pool_contribution': 'none',  # No global pool from deposits
+                'global_pool_usd': str(global_pool),
             }
         )
         dr.status = 'CREDITED'

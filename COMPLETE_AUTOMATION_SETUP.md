@@ -92,7 +92,7 @@ ENABLE_SCHEDULER=true
 
 Set up external monitoring to call your API endpoint daily:
 ```bash
-curl -X POST "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" \
+curl -X POST "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN"
 ```
 

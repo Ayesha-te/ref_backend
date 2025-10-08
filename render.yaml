@@ -6,13 +6,11 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      cd ref_backend &&
       pip install -r requirements.txt &&
       python manage.py collectstatic --noinput &&
       python manage.py migrate
-    startCommand: |
-      cd ref_backend &&
-      gunicorn core.wsgi:application --config gunicorn.conf.py
+    startCommand: gunicorn core.wsgi:application --config gunicorn.conf.py
+    healthCheckPath: /  # ✅ Health check endpoint for Render
     envVars:
       - key: DJANGO_SECRET_KEY
         generateValue: true
@@ -23,9 +21,9 @@ services:
           name: nexocart-db
           property: connectionString
       - key: GUNICORN_WORKERS
-        value: "2"
+        value: "3"  # Increased for better stability
       - key: GUNICORN_THREADS
-        value: "4"
+        value: "2"  # Reduced to prevent resource issues
       - key: ADMIN_USD_TO_PKR
         value: "280.0"
       - key: SIGNUP_FEE_PKR

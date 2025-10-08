@@ -11,7 +11,7 @@ from django.db.models.functions import Coalesce
 from .serializers import UserSerializer, SignupSerializer, SignupProofSerializer
 from .models import SignupProof
 from apps.earnings.models import PassiveEarning
-from apps.wallets.models import DepositRequest
+from apps.wallets.models import DepositRequest, Transaction
 
 User = get_user_model()
 
@@ -286,8 +286,23 @@ class AdminUsersListView(generics.GenericAPIView):
             users = users.filter(date_joined__date__lte=dj_to)
 
         users = users.annotate(
+            # PassiveEarning model sum (might be dummy data)
             rewards_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
             passive_income_usd=Coalesce(Sum('passive_earnings__amount_usd'), Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))),
+            # Transaction-based passive income (real data)
+            passive_income_from_transactions=Coalesce(
+                Subquery(
+                    Transaction.objects.filter(
+                        wallet__user=OuterRef('pk'),
+                        type=Transaction.CREDIT,
+                        meta__type='passive'
+                    ).values('wallet__user')
+                    .annotate(total=Sum('amount_usd'))
+                    .values('total')[:1],
+                    output_field=DecimalField(max_digits=12, decimal_places=2)
+                ), 
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2))
+            ),
             bank_name=Subquery(latest_dr.values('bank_name')[:1], output_field=CharField()),
             account_name=Subquery(latest_dr.values('account_name')[:1], output_field=CharField()),
             referrals_count=Count('referrals', distinct=True),  # direct referrals
@@ -318,16 +333,9 @@ class AdminUsersListView(generics.GenericAPIView):
             except:
                 current_balance_usd = '0.00'
             
-            # Only show passive income for users who have made actual investments (excluding signup initial)
-            has_investment = DepositRequest.objects.filter(
-                user=u, 
-                status='CREDITED'
-            ).exclude(tx_id='SIGNUP-INIT').exists()
-            
-            if has_investment:
-                passive_earnings_amount = str(getattr(u, 'passive_income_usd', 0) or 0)
-            else:
-                passive_earnings_amount = '0.00'
+            # Use transaction-based passive income as the primary value (real data)
+            real_passive_income = str(getattr(u, 'passive_income_from_transactions', 0) or 0)
+            dummy_passive_income = str(getattr(u, 'passive_income_usd', 0) or 0)
             
             data.append({
                 'id': u.id,
@@ -340,9 +348,9 @@ class AdminUsersListView(generics.GenericAPIView):
                 'is_approved': u.is_approved,
                 'date_joined': u.date_joined,
                 'last_login': u.last_login,
-                'rewards_usd': str(getattr(u, 'rewards_usd', 0) or 0),
-                'passive_income_usd': passive_earnings_amount,
-                'total_passive_earnings': passive_earnings_amount,  # For admin panel compatibility
+                'rewards_usd': real_passive_income,  # Use real transaction-based data
+                'passive_income_usd': real_passive_income,  # Use real transaction-based data
+                'passive_income_from_model': dummy_passive_income,  # For debugging/comparison
                 'current_balance_usd': current_balance_usd,
                 'bank_name': getattr(u, 'bank_name', '') or '',
                 'account_name': getattr(u, 'account_name', '') or '',

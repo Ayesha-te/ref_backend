@@ -48,7 +48,7 @@ Check Render logs for these messages:
 ### **Step 3: Generate Initial Production Data**
 ```powershell
 # Get admin token
-$response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+$response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
 $token = $response.access
 
 # Generate 10 days of earnings to get started

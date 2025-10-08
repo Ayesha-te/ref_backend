@@ -11,10 +11,17 @@
     return base;
   }
   const defaultApiBaseRaw =
-    (typeof localStorage !== 'undefined' && localStorage.getItem('adminApiBase')) ||
     new URLSearchParams(location.search).get('apiBase') ||
-    new URL('/api', location.origin).toString().replace(/\/$/, '');
+    'https://ref-backend-fw8y.onrender.com/api'; // Force production backend
   const defaultApiBase = normalizeApiBase(defaultApiBaseRaw);
+  
+  // Clear any conflicting localStorage that might cause issues
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('adminApiBase');
+    localStorage.setItem('adminApiBase', defaultApiBase);
+  }
+  
+  console.log('🔧 DEBUG: Forced API base to:', defaultApiBase);
   // Initialize state with tokens from localStorage if available
   const state = {
     apiBase: defaultApiBase,
@@ -203,13 +210,22 @@
   };
 
   function authHeaders(headers={}){
-    if(state.access){ 
-      headers['Authorization'] = `Bearer ${state.access}`;
-      console.log('Adding Authorization header with token:', state.access.substring(0, 20) + '...');
+    // Ensure we always start with proper headers
+    const baseHeaders = {
+      'Content-Type': 'application/json',
+      ...headers
+    };
+    
+    if(state.access && state.access.trim()){ 
+      baseHeaders['Authorization'] = `Bearer ${state.access}`;
+      console.log('🔑 Adding Authorization header with token:', state.access.substring(0, 20) + '...');
+      console.log('🔍 Full headers being sent:', baseHeaders);
     } else {
-      console.log('No access token available for Authorization header');
+      console.log('❌ No access token available for Authorization header');
+      console.log('🔍 Token in state:', state.access ? 'exists' : 'missing');
+      console.log('🔍 Token in localStorage:', localStorage.getItem('admin_access') ? 'exists' : 'missing');
     }
-    return headers;
+    return baseHeaders;
   }
 
   const get = async (url) => {

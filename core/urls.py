@@ -4,9 +4,35 @@ from django.conf import settings
 from django.views.static import serve
 from rest_framework_simplejwt.views import TokenRefreshView
 from apps.accounts.views import TokenObtainPairPatchedView
-from apps.accounts.bootstrap_views import bootstrap_production_earnings
+from django.http import JsonResponse
+from django.contrib.auth import get_user_model
+
+def health_check(request):
+    """Health check endpoint for Render deployment"""
+    return JsonResponse({"status": "ok", "service": "nexocart-backend"}, status=200)
+
+def debug_admin(request):
+    """Debug endpoint to check admin user status"""
+    User = get_user_model()
+    try:
+        admin_user = User.objects.get(username='Ahmad')
+        return JsonResponse({
+            "admin_exists": True,
+            "is_staff": admin_user.is_staff,
+            "is_superuser": admin_user.is_superuser,
+            "is_approved": getattr(admin_user, 'is_approved', True),
+            "is_active": admin_user.is_active,
+            "total_users": User.objects.count(),
+        })
+    except User.DoesNotExist:
+        return JsonResponse({
+            "admin_exists": False,
+            "total_users": User.objects.count(),
+        })
 
 urlpatterns = [
+    path('', health_check, name='health_check'),  # ✅ Root health check for Render
+    path('debug/admin/', debug_admin, name='debug_admin'),  # Debug endpoint
     path('admin/', admin.site.urls),
     path('api/auth/token/', TokenObtainPairPatchedView.as_view(), name='token_obtain_pair'),
     path('api/auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
@@ -16,8 +42,6 @@ urlpatterns = [
     path('api/referrals/', include('apps.referrals.urls')),
     path('api/withdrawals/', include('apps.withdrawals.urls')),
     path('api/marketplace/', include('apps.marketplace.urls')),
-    # Bootstrap endpoint for free tier deployment
-    path('api/bootstrap-earnings/', bootstrap_production_earnings, name='bootstrap_earnings'),
 ]
 
 # Serve media files (including in production)

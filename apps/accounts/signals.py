@@ -22,18 +22,37 @@ def on_user_approved(sender, instance: User, created, **kwargs):
         # 1) Referral payouts on "joining" (approval event) - now percentage of signup payment
         pay_on_package_purchase(instance)
 
-        # 2) Add percentage of signup payment to global pool per joining (optional; defaults to 0.50 USD fallback)
-        pool, _ = GlobalPool.objects.get_or_create(pk=1)
-        try:
-            signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
-            rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
-            join_base_usd = (signup_fee_pkr / rate).quantize(Decimal('0.01'))
-            # keep 0.5 USD minimum top-up like before if computed is less than 0.50
-            top_up = max(join_base_usd * Decimal('0.00'), Decimal('0.50'))  # 0% of base, min $0.50
-        except Exception:
-            top_up = Decimal('0.50')
-        pool.balance_usd = (Decimal(pool.balance_usd) + top_up).quantize(Decimal('0.01'))
-        pool.save()
+        # 2) Add 0.5% of signup payment to global pool ONLY if user joins on Monday
+        current_day = timezone.now().weekday()  # Monday = 0, Sunday = 6
+        if current_day == 0:  # Only on Monday
+            pool, _ = GlobalPool.objects.get_or_create(pk=1)
+            try:
+                signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
+                rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
+                join_base_usd = (signup_fee_pkr / rate).quantize(Decimal('0.01'))
+                # 0.5% of signup fee for Monday joiners
+                monday_contribution = (join_base_usd * Decimal('0.005')).quantize(Decimal('0.01'))
+            except Exception:
+                monday_contribution = Decimal('0.00')  # No fallback - only Monday joiners contribute
+            
+            if monday_contribution > 0:
+                pool.balance_usd = (Decimal(pool.balance_usd) + monday_contribution).quantize(Decimal('0.01'))
+                pool.save()
+                
+                # Record the Monday joining contribution in transaction
+                wallet, _ = Wallet.objects.get_or_create(user=instance)
+                Transaction.objects.create(
+                    wallet=wallet,
+                    type=Transaction.DEBIT,  # This is taken from their signup fee
+                    amount_usd=monday_contribution,
+                    meta={
+                        'type': 'global_pool_contribution',
+                        'source': 'monday_joining',
+                        'signup_fee_pkr': str(signup_fee_pkr),
+                        'contribution_rate': '0.5%',
+                        'day_of_week': 'Monday'
+                    }
+                )
 
         # 3) Initial signup deposit credit -> PKR to USD by admin rate
         try:

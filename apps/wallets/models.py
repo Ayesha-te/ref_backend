@@ -12,27 +12,31 @@ class Wallet(models.Model):
         """Calculate total current income from transactions (passive + referral + milestone + global pool)"""
         from django.db.models import Sum, Q
         
-        # Sum all income credits (passive, referral, milestone, global_pool)
+        # Sum all income credits (passive, referral, milestone, global_pool, referral_correction)
+        # Using meta__contains for PostgreSQL JSONB compatibility
         income_credits = self.transactions.filter(
             type=Transaction.CREDIT
         ).filter(
-            Q(meta__type='passive') | 
-            Q(meta__type='referral') | 
-            Q(meta__type='milestone') |
-            Q(meta__type='global_pool')
+            Q(meta__contains={'type': 'passive'}) | 
+            Q(meta__contains={'type': 'referral'}) | 
+            Q(meta__contains={'type': 'milestone'}) |
+            Q(meta__contains={'type': 'global_pool'}) |
+            Q(meta__contains={'type': 'referral_correction'})  # Include correction transactions
         ).exclude(
-            meta__source='signup-initial'
+            meta__contains={'source': 'signup-initial'}
         ).exclude(
-            meta__non_income=True
+            meta__contains={'non_income': True}
         ).aggregate(total=Sum('amount_usd'))['total'] or Decimal('0')
         
-        # Subtract all withdrawal debits
-        withdrawal_debits = self.transactions.filter(
-            type=Transaction.DEBIT,
-            meta__type='withdrawal'
+        # Subtract all income-related debits (withdrawals and referral reversals)
+        income_debits = self.transactions.filter(
+            type=Transaction.DEBIT
+        ).filter(
+            Q(meta__contains={'type': 'withdrawal'}) |
+            Q(meta__contains={'type': 'referral_reversal'})  # Include reversal transactions
         ).aggregate(total=Sum('amount_usd'))['total'] or Decimal('0')
         
-        return (income_credits - withdrawal_debits).quantize(Decimal('0.01'))
+        return (income_credits - income_debits).quantize(Decimal('0.01'))
 
 class Transaction(models.Model):
     CREDIT = 'CREDIT'

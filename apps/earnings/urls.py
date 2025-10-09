@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import MyEarningsSummary, AdminGlobalPoolView, AdminSystemOverviewView
-from .admin_views import SchedulerStatusView, TriggerEarningsNowView
+from .admin_views import SchedulerStatusView, TriggerEarningsNowView, MiddlewareStatusView
 
 urlpatterns = [
     path('me/summary/', MyEarningsSummary.as_view()),
@@ -11,4 +11,6 @@ urlpatterns = [
     # Scheduler management endpoints
     path('scheduler-status/', SchedulerStatusView.as_view()),
     path('trigger-earnings-now/', TriggerEarningsNowView.as_view()),
+    # Middleware status check
+    path('middleware-status/', MiddlewareStatusView.as_view()),
 ]

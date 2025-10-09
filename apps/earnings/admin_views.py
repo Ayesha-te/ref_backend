@@ -99,3 +99,46 @@ class TriggerEarningsNowView(views.APIView):
     def get(self, request):
         """Allow GET requests for simple cron services"""
         return self.post(request)
+
+
+class MiddlewareStatusView(views.APIView):
+    """Check if the AutoDailyEarningsMiddleware is working"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        try:
+            from django.conf import settings
+            from apps.earnings.models import DailyEarningsState
+            from django.utils import timezone
+            
+            # Check middleware configuration
+            middleware_list = settings.MIDDLEWARE
+            middleware_enabled = 'core.middleware.AutoDailyEarningsMiddleware' in middleware_list
+            
+            # Get current state
+            today = timezone.now().date()
+            try:
+                state = DailyEarningsState.objects.get(pk=1)
+                last_processed = state.last_processed_date
+                last_processed_at = state.last_processed_at
+                is_processed_today = last_processed >= today
+            except DailyEarningsState.DoesNotExist:
+                last_processed = None
+                last_processed_at = None
+                is_processed_today = False
+            
+            return Response({
+                'middleware_enabled': middleware_enabled,
+                'middleware_class': 'core.middleware.AutoDailyEarningsMiddleware',
+                'today': str(today),
+                'last_processed_date': str(last_processed) if last_processed else None,
+                'last_processed_at': str(last_processed_at) if last_processed_at else None,
+                'is_processed_today': is_processed_today,
+                'status': 'Working' if middleware_enabled and is_processed_today else 'Not processed today',
+                'message': 'Middleware will auto-process on next request' if middleware_enabled and not is_processed_today else 'All good!'
+            })
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'middleware_enabled': False
+            }, status=500)

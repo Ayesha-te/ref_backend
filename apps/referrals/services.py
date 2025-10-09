@@ -56,16 +56,25 @@ def record_direct_first_investment(referrer: User, direct: User, amount_usd: Dec
     prog.save()
 
 
-def pay_on_package_purchase(buyer: User):
+def pay_on_package_purchase(buyer: User, signup_amount_pkr: Decimal = None):
     """Distribute referral rewards when buyer is approved (joins).
     - L1: 6%
     - L2: 3%
     - L3: 1%
     Referral rewards are percentages of the signup payment amount (converted to USD).
     Milestones (if configured) are also percentage-based of the same base amount.
+    
+    Args:
+        buyer: The user who is being approved
+        signup_amount_pkr: The actual signup amount in PKR (from SignupProof). 
+                          If None, falls back to settings.SIGNUP_FEE_PKR
     """
-    # Determine signup payment base in USD from PKR configured fee and current admin FX rate
-    signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
+    # Determine signup payment base in USD from actual PKR amount or fallback to configured fee
+    if signup_amount_pkr is None:
+        signup_fee_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
+    else:
+        signup_fee_pkr = Decimal(str(signup_amount_pkr))
+    
     rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
     base_signup_usd = (signup_fee_pkr / rate).quantize(Decimal('0.01'))
 
@@ -87,7 +96,7 @@ def pay_on_package_purchase(buyer: User):
         if amt <= 0:
             continue
         wallet, _ = Wallet.objects.get_or_create(user=ref_user)
-        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join', 'base': str(base_signup_usd), 'pct': str(pct)})
+        _credit(wallet, amt, meta={'type': 'referral', 'level': lvl, 'source_user': buyer.id, 'trigger': 'join', 'base': str(base_signup_usd), 'pct': str(pct), 'signup_amount_pkr': str(signup_fee_pkr)})
         ReferralPayout.objects.create(referrer=ref_user, referee=buyer, level=lvl, amount_usd=amt)
 
 

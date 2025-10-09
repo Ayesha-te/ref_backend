@@ -10,6 +10,8 @@ class ReferralPayout(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        # Prevent duplicate payouts for the same referrer-referee-level combination
+        unique_together = [['referrer', 'referee', 'level']]
 
 
 class ReferralMilestoneProgress(models.Model):

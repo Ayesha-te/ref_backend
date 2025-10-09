@@ -58,11 +58,22 @@ class SchedulerStatusView(views.APIView):
 
 class TriggerEarningsNowView(views.APIView):
     """Manually trigger earnings generation immediately"""
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.AllowAny]  # Allow external cron services
     
     def post(self, request):
         try:
+            from django.conf import settings
             from apps.earnings.scheduler import trigger_daily_earnings_now
+            
+            # Check for secret key if configured (for security)
+            secret_key = getattr(settings, 'CRON_SECRET_KEY', None)
+            if secret_key:
+                provided_key = request.headers.get('X-Cron-Secret') or request.data.get('secret')
+                if provided_key != secret_key:
+                    return Response({
+                        'success': False,
+                        'error': 'Invalid or missing secret key'
+                    }, status=403)
             
             # Capture output
             old_stdout = sys.stdout
@@ -84,3 +95,7 @@ class TriggerEarningsNowView(views.APIView):
                 'success': False,
                 'error': str(e)
             }, status=500)
+    
+    def get(self, request):
+        """Allow GET requests for simple cron services"""
+        return self.post(request)

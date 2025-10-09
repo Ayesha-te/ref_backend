@@ -1,7 +1,7 @@
 """
 Automatic scheduler for daily earnings generation
 This scheduler runs in the background and triggers daily earnings automatically
-Designed for Render free tier - no external cron needed
+Improved version with better error handling and persistence
 """
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -10,11 +10,15 @@ from django.conf import settings
 import logging
 import atexit
 import os
+import threading
+import time
 
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
 scheduler = None
+scheduler_lock = threading.Lock()
+health_check_thread = None
 
 def start_scheduler():
     """Start the background scheduler for automated daily tasks"""
@@ -88,6 +92,10 @@ def start_scheduler():
         logger.info(f"📋 Scheduled {len(jobs)} jobs:")
         for job in jobs:
             logger.info(f"   - {job.name}: {job.next_run_time}")
+        
+        # Start health check monitoring (only in production)
+        if not getattr(settings, 'DEBUG', False):
+            start_health_monitor()
         
     except Exception as e:
         logger.error(f"❌ Failed to start scheduler: {str(e)}")
@@ -169,3 +177,46 @@ def restart_scheduler():
     if scheduler:
         stop_scheduler()
     start_scheduler()
+
+def start_health_monitor():
+    """Start a health monitoring thread to ensure scheduler stays alive"""
+    global health_check_thread
+    
+    if health_check_thread and health_check_thread.is_alive():
+        logger.info("Health monitor already running")
+        return
+    
+    def health_monitor():
+        """Monitor scheduler health and restart if needed"""
+        logger.info("🏥 Health monitor started")
+        check_interval = 300  # Check every 5 minutes
+        
+        while True:
+            try:
+                time.sleep(check_interval)
+                
+                global scheduler
+                with scheduler_lock:
+                    if not scheduler or not scheduler.running:
+                        logger.warning("⚠️ Scheduler is not running! Attempting restart...")
+                        try:
+                            start_scheduler()
+                            logger.info("✅ Scheduler restarted successfully")
+                        except Exception as e:
+                            logger.error(f"❌ Failed to restart scheduler: {str(e)}")
+                    else:
+                        # Verify jobs are still scheduled
+                        jobs = scheduler.get_jobs()
+                        if len(jobs) == 0:
+                            logger.warning("⚠️ No jobs scheduled! Restarting scheduler...")
+                            stop_scheduler()
+                            start_scheduler()
+                        else:
+                            logger.debug(f"✅ Health check passed - {len(jobs)} jobs active")
+                            
+            except Exception as e:
+                logger.error(f"❌ Health monitor error: {str(e)}")
+    
+    health_check_thread = threading.Thread(target=health_monitor, daemon=True, name="SchedulerHealthMonitor")
+    health_check_thread.start()
+    logger.info("🏥 Health monitor thread started")

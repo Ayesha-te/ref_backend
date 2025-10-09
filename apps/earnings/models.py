@@ -11,3 +11,16 @@ class PassiveEarning(models.Model):
     class Meta:
         unique_together = ("user", "day_index")
         ordering = ['-created_at']
+
+
+class DailyEarningsState(models.Model):
+    """Singleton model to track when daily earnings were last processed"""
+    last_processed_date = models.DateField()
+    last_processed_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = "Daily Earnings State"
+        verbose_name_plural = "Daily Earnings State"
+    
+    def __str__(self):
+        return f"Last processed: {self.last_processed_date}"

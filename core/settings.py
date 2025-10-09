@@ -34,6 +34,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'core.middleware.DBRetryMiddleware',  # Handle Neon DB sleep mode
+    'core.middleware.AutoDailyEarningsMiddleware',  # Auto-trigger daily earnings (Render-friendly)
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -220,6 +221,9 @@ SCHEDULER_CONFIG = {
     'DAILY_EARNINGS_MINUTE': int(os.environ.get('DAILY_EARNINGS_MINUTE', '1')),
     'HEARTBEAT_INTERVAL': int(os.environ.get('HEARTBEAT_INTERVAL', '3600')),
 }
+
+# Secret key for external cron services (optional but recommended)
+CRON_SECRET_KEY = os.environ.get('CRON_SECRET_KEY', None)
 
 # Logging configuration for debugging database issues
 LOGGING = {

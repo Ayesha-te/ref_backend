@@ -193,5 +193,158 @@ class AutoDailyEarningsMiddleware:
                 
                 logger.info(f"✅ Daily earnings auto-processed: {total_users_processed} users, ${total_amount_usd}")
                 
+                # ===== GLOBAL POOL PROCESSING (Mondays Only) =====
+                # Check if today is Monday (weekday() returns 0 for Monday)
+                if today.weekday() == 0:
+                    self._process_global_pool_monday(today)
+                
             finally:
                 self._processing = False
+    
+    def _process_global_pool_monday(self, monday_date):
+        """Process global pool on Mondays: collect from signups and distribute to all users"""
+        from apps.earnings.models import GlobalPoolState, GlobalPoolCollection, GlobalPoolDistribution
+        from apps.wallets.models import Wallet, Transaction, DepositRequest
+        from django.contrib.auth import get_user_model
+        from decimal import Decimal
+        
+        logger.info(f"🌍 Processing Global Pool for Monday: {monday_date}")
+        
+        User = get_user_model()
+        
+        # Get or create global pool state
+        pool_state, created = GlobalPoolState.objects.get_or_create(pk=1)
+        
+        # ===== COLLECTION PHASE =====
+        # Only collect if we haven't collected for this Monday yet
+        if pool_state.last_collection_date != monday_date:
+            logger.info(f"📥 Collecting 0.5% from Monday signups...")
+            
+            # Find all SIGNUP-INIT deposits from this Monday
+            from datetime import datetime
+            monday_start = datetime.combine(monday_date, datetime.min.time())
+            monday_end = datetime.combine(monday_date, datetime.max.time())
+            
+            signup_deposits = DepositRequest.objects.filter(
+                tx_id='SIGNUP-INIT',
+                status='CREDITED',
+                created_at__gte=monday_start,
+                created_at__lte=monday_end
+            )
+            
+            total_collected = Decimal('0')
+            collection_count = 0
+            
+            for deposit in signup_deposits:
+                # Check if already collected
+                existing = GlobalPoolCollection.objects.filter(
+                    user=deposit.user,
+                    collection_date=monday_date
+                ).exists()
+                
+                if existing:
+                    continue
+                
+                # Calculate 0.5% of signup amount
+                signup_amount = deposit.amount_usd
+                collection_amount = (signup_amount * Decimal('0.005')).quantize(Decimal('0.01'))
+                
+                # Record the collection
+                GlobalPoolCollection.objects.create(
+                    user=deposit.user,
+                    signup_amount_usd=signup_amount,
+                    collection_amount_usd=collection_amount,
+                    collection_date=monday_date
+                )
+                
+                total_collected += collection_amount
+                collection_count += 1
+                
+                logger.info(f"  ✅ Collected ${collection_amount} from {deposit.user.username}")
+            
+            # Update pool state
+            pool_state.current_pool_usd += total_collected
+            pool_state.total_collected_all_time += total_collected
+            pool_state.last_collection_date = monday_date
+            pool_state.save()
+            
+            logger.info(f"✅ Collection complete: ${total_collected} from {collection_count} signups. Pool now: ${pool_state.current_pool_usd}")
+        
+        # ===== DISTRIBUTION PHASE =====
+        # Only distribute if we haven't distributed for this Monday yet AND pool has balance
+        if pool_state.last_distribution_date != monday_date and pool_state.current_pool_usd > 0:
+            logger.info(f"📤 Distributing pool to all users...")
+            
+            # Get all active users (users with wallets)
+            active_users = User.objects.filter(wallet__isnull=False).distinct()
+            
+            if not active_users.exists():
+                logger.warning("⚠️ No active users to distribute to")
+                return
+            
+            total_users = active_users.count()
+            pool_amount = pool_state.current_pool_usd
+            per_user_amount = (pool_amount / Decimal(total_users)).quantize(Decimal('0.01'))
+            
+            if per_user_amount <= 0:
+                logger.warning("⚠️ Per-user amount is zero or negative")
+                return
+            
+            logger.info(f"💰 Distributing ${pool_amount} to {total_users} users (${per_user_amount} each)")
+            
+            distribution_count = 0
+            
+            for user in active_users:
+                # Check if already distributed
+                existing = GlobalPoolDistribution.objects.filter(
+                    user=user,
+                    distribution_date=monday_date
+                ).exists()
+                
+                if existing:
+                    continue
+                
+                # Get user's wallet
+                wallet = user.wallet
+                
+                # Credit to income_usd (80% user share) and hold_usd (20% platform hold)
+                user_share = (per_user_amount * Decimal('0.80')).quantize(Decimal('0.01'))
+                platform_hold = (per_user_amount * Decimal('0.20')).quantize(Decimal('0.01'))
+                
+                wallet.income_usd += user_share
+                wallet.hold_usd += platform_hold
+                wallet.save()
+                
+                # Create transaction record
+                Transaction.objects.create(
+                    wallet=wallet,
+                    type=Transaction.CREDIT,
+                    amount_usd=per_user_amount,
+                    meta={
+                        'type': 'global_pool',
+                        'distribution_date': str(monday_date),
+                        'total_pool': str(pool_amount),
+                        'total_users': total_users,
+                        'user_share': str(user_share),
+                        'platform_hold': str(platform_hold),
+                    }
+                )
+                
+                # Record distribution
+                GlobalPoolDistribution.objects.create(
+                    user=user,
+                    amount_usd=per_user_amount,
+                    distribution_date=monday_date,
+                    total_pool_amount=pool_amount,
+                    total_users=total_users
+                )
+                
+                distribution_count += 1
+            
+            # Update pool state - reset pool to 0 after distribution
+            pool_state.current_pool_usd = Decimal('0')
+            pool_state.total_distributed_all_time += pool_amount
+            pool_state.last_distribution_date = monday_date
+            pool_state.save()
+            
+            logger.info(f"✅ Distribution complete: ${pool_amount} to {distribution_count} users. Pool reset to $0")

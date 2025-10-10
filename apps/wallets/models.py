@@ -12,7 +12,7 @@ class Wallet(models.Model):
         """Calculate total current income from transactions (passive + referral + milestone + global pool)"""
         from django.db.models import Sum, Q
         
-        # Sum all income credits (passive, referral, milestone, global_pool, referral_correction)
+        # Sum all income credits (passive, referral, milestone, global_pool)
         # Using meta__contains for PostgreSQL JSONB compatibility
         income_credits = self.transactions.filter(
             type=Transaction.CREDIT

@@ -115,6 +115,24 @@ class AutoDailyEarningsMiddleware:
                     if not first_dep:
                         continue
                     
+                    # ===== CRITICAL: Day 0 Protection =====
+                    # Calculate how many days have passed since the deposit was credited
+                    deposit_date = first_dep.processed_at or first_dep.created_at
+                    if not deposit_date:
+                        logger.warning(f"⚠️ Skipping {u.username}: No deposit date available")
+                        continue
+                    
+                    # Calculate days elapsed since deposit
+                    now = timezone.now()
+                    time_diff = now - deposit_date
+                    days_since_deposit = time_diff.days
+                    
+                    # CRITICAL: Don't generate passive income on day 0 (same day as deposit)
+                    # User must wait at least 1 full day before receiving passive income
+                    if days_since_deposit < 1:
+                        logger.warning(f"⚠️ Skipping {u.username}: Deposit was made today (day 0). Passive income starts after 1 full day.")
+                        continue
+                    
                     # Link to referrer milestone once per user
                     wallet, _ = Wallet.objects.get_or_create(user=u)
                     flag_key = f"first_investment_recorded:{u.id}"
@@ -132,8 +150,12 @@ class AutoDailyEarningsMiddleware:
                     last = PassiveEarning.objects.filter(user=u).order_by('-day_index').first()
                     current_day = (last.day_index + 1) if last else 1
                     
-                    # Stop at day 90 (max earning period)
-                    if current_day > 90:
+                    # Cap earnings at the minimum of days_since_deposit and 90 (max earning period)
+                    # This prevents generating earnings for future days that haven't occurred yet
+                    max_allowed_day = min(days_since_deposit, 90)
+                    
+                    # Stop if we've already generated earnings up to the allowed day
+                    if current_day > max_allowed_day:
                         continue
                     
                     # Compute and credit earnings

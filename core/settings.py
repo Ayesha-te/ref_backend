@@ -190,7 +190,7 @@ ECONOMICS = {
     ],
     'USER_WALLET_SHARE': float(os.environ.get('USER_WALLET_SHARE', '0.80')),
     'WITHDRAW_TAX': float(os.environ.get('WITHDRAW_TAX', '0.20')),  # 20% withdraw tax
-    'GLOBAL_POOL_CUT': float(os.environ.get('GLOBAL_POOL_CUT', '0.10')), # optional applied before referral
+    'GLOBAL_POOL_CUT': float(os.environ.get('GLOBAL_POOL_CUT', '0.005')), # 0.5% for global pool
     # Referral tiers default (after gates): L1=6%, L2=3%, L3=1%. Can be overridden via env: 0.06,0.03,0.01
     'REFERRAL_TIERS': [float(x) for x in os.environ.get('REFERRAL_TIERS', '0.06,0.03,0.01').split(',')],
     # Milestone payout percents per target, e.g. "10:0.05,30:0.10" (optional)

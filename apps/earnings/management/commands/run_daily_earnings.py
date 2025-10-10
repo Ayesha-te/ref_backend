@@ -58,11 +58,26 @@ class Command(BaseCommand):
         total_users_processed = 0
         total_earnings_generated = 0
         total_amount_usd = Decimal('0.00')
+        total_global_pool_collected = Decimal('0.00')
 
         for u in users:
             # Only start passive earnings after first credited deposit (exclude signup initial)
             first_dep = DepositRequest.objects.filter(user=u, status='CREDITED').exclude(tx_id='SIGNUP-INIT').order_by('processed_at', 'created_at').first()
             if not first_dep:
+                continue
+
+            # CRITICAL FIX: Check if at least 1 day has passed since the deposit was credited
+            # Passive income should only start generating after the first full day
+            deposit_date = first_dep.processed_at or first_dep.created_at
+            if not deposit_date:
+                continue
+            
+            # Calculate days since deposit
+            days_since_deposit = (timezone.now() - deposit_date).days
+            
+            # Skip if deposit was made today (day 0) - passive income starts from day 1
+            if days_since_deposit < 1:
+                self.stdout.write(self.style.WARNING(f"⏳ {u.username}: Deposit too recent (day {days_since_deposit}), skipping passive income generation"))
                 continue
 
             # Link to referrer milestone once per user
@@ -77,6 +92,15 @@ class Command(BaseCommand):
             last = PassiveEarning.objects.filter(user=u).order_by('-day_index').first()
             start_day = (last.day_index + 1) if last else 1
 
+            # ADDITIONAL CHECK: Ensure we don't generate more days than have actually passed
+            # If user has been earning for X days, they should only have X earnings records
+            max_allowed_day = min(days_since_deposit, 90)  # Cap at 90 days max
+            
+            # Skip if we've already generated earnings for all elapsed days
+            if start_day > max_allowed_day:
+                self.stdout.write(self.style.WARNING(f"⏸️  {u.username}: Already up to date (day {start_day-1}/{max_allowed_day})"))
+                continue
+
             # Process multiple days if backfilling
             user_earnings_count = 0
             user_total_usd = Decimal('0.00')
@@ -87,6 +111,11 @@ class Command(BaseCommand):
                 # Stop at day 90 (max earning period)
                 if current_day > 90:
                     self.stdout.write(self.style.WARNING(f"⚠️  {u.username} reached max 90 days"))
+                    break
+                
+                # CRITICAL: Don't generate earnings for days that haven't passed yet
+                if current_day > max_allowed_day:
+                    self.stdout.write(self.style.WARNING(f"⏸️  {u.username}: Cannot generate day {current_day} (only {max_allowed_day} days have passed)"))
                     break
 
                 metrics = compute_daily_earning_usd(current_day)
@@ -106,6 +135,11 @@ class Command(BaseCommand):
                     wallet.income_usd = (Decimal(wallet.income_usd) + metrics['user_share_usd']).quantize(Decimal('0.01'))
                     wallet.hold_usd = (Decimal(wallet.hold_usd) + metrics['platform_hold_usd']).quantize(Decimal('0.01'))
                     wallet.save()
+
+                    # Collect global pool cut
+                    pool.balance_usd = (Decimal(pool.balance_usd) + metrics['global_pool_usd']).quantize(Decimal('0.01'))
+                    pool.save()
+                    total_global_pool_collected += metrics['global_pool_usd']
 
                     # Create transaction record for passive income display
                     Transaction.objects.create(
@@ -134,6 +168,8 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f"💰 Total Earnings Generated: {total_earnings_generated}"))
         self.stdout.write(self.style.SUCCESS(f"💵 Total Amount: ${total_amount_usd}"))
         self.stdout.write(self.style.SUCCESS(f"💵 Total Amount (PKR): ₨{float(total_amount_usd) * 280:,.2f}"))
+        self.stdout.write(self.style.SUCCESS(f"🏦 Global Pool Collected: ${total_global_pool_collected}"))
+        self.stdout.write(self.style.SUCCESS(f"🏦 Global Pool Balance: ${pool.balance_usd}"))
         if dry_run:
             self.stdout.write(self.style.WARNING("\n🔍 This was a DRY RUN - no changes were made"))
             self.stdout.write(self.style.WARNING("Run without --dry-run to apply changes"))

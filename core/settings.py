@@ -215,7 +215,9 @@ ADMIN_ACCOUNT_NAME = os.environ.get('ADMIN_ACCOUNT_NAME', '')
 ADMIN_ACCOUNT_ID = os.environ.get('ADMIN_ACCOUNT_ID', '')
 
 # Scheduler configuration for automated daily earnings
-ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', 'true' if not DEBUG else 'false').lower() == 'true'
+# DISABLED: Using middleware instead (AutoDailyEarningsMiddleware)
+# Middleware is more reliable and doesn't require APScheduler
+ENABLE_SCHEDULER = os.environ.get('ENABLE_SCHEDULER', 'false').lower() == 'true'
 SCHEDULER_CONFIG = {
     'DAILY_EARNINGS_HOUR': int(os.environ.get('DAILY_EARNINGS_HOUR', '0')),
     'DAILY_EARNINGS_MINUTE': int(os.environ.get('DAILY_EARNINGS_MINUTE', '1')),

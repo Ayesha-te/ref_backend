@@ -62,11 +62,11 @@ def check_user(user):
     # Get transactions by type
     all_txns = Transaction.objects.filter(wallet=wallet)
     
-    passive_txns = all_txns.filter(meta__type='passive', transaction_type='CREDIT')
-    referral_txns = all_txns.filter(meta__type='referral', transaction_type='CREDIT')
-    milestone_txns = all_txns.filter(meta__type='milestone', transaction_type='CREDIT')
-    global_pool_txns = all_txns.filter(meta__type='global_pool', transaction_type='CREDIT')
-    withdrawal_txns = all_txns.filter(transaction_type='DEBIT')
+    passive_txns = all_txns.filter(meta__contains={'type': 'passive'}, type='CREDIT')
+    referral_txns = all_txns.filter(meta__contains={'type': 'referral'}, type='CREDIT')
+    milestone_txns = all_txns.filter(meta__contains={'type': 'milestone'}, type='CREDIT')
+    global_pool_txns = all_txns.filter(meta__contains={'type': 'global_pool'}, type='CREDIT')
+    withdrawal_txns = all_txns.filter(type='DEBIT')
     
     total_passive = sum([t.amount_usd for t in passive_txns])
     total_referral = sum([t.amount_usd for t in referral_txns])

@@ -14,10 +14,16 @@ from decimal import Decimal
 
 User = get_user_model()
 
-# Find user Laeiq
-try:
-    user = User.objects.get(username__iexact='laeiq')
-except User.DoesNotExist:
+# Find user Laeiq (check username contains 'laeiq')
+from django.db.models import Q
+
+user = User.objects.filter(
+    Q(username__iexact='laeiq') | 
+    Q(username__icontains='laeiq') |
+    Q(email__icontains='laeiq')
+).first()
+
+if not user:
     print("❌ User 'Laeiq' not found")
     print("\nAvailable users:")
     for u in User.objects.all()[:10]:

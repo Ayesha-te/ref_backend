@@ -1,0 +1,140 @@
+================================================================================
+🚀 COPY & PASTE THIS INTO RENDER SHELL
+================================================================================
+
+STEP 1: Check what's wrong
+---------------------------
+python manage.py comprehensive_passive_check
+
+
+STEP 2: Fix everything automatically
+-------------------------------------
+python manage.py fix_all_passive_income
+
+
+STEP 3: Verify it's fixed
+--------------------------
+python manage.py comprehensive_passive_check
+
+
+================================================================================
+THAT'S IT! 🎉
+================================================================================
+
+If you want to investigate specific users, use this:
+----------------------------------------------------
+
+python manage.py shell
+
+Then paste this (change user_id to the user you want to check):
+
+from apps.wallets.models import Transaction, Wallet
+user_id = 2
+wallet = Wallet.objects.get(user_id=user_id)
+txs = Transaction.objects.filter(wallet=wallet, type='CREDIT').exclude(meta__contains={'type': 'deposit'})
+print(f"\nUser ID {user_id} - Income Breakdown:")
+print(f"{'='*60}\n")
+for tx in txs:
+    tx_type = tx.meta.get('type', 'unknown')
+    print(f"${tx.amount_usd:>6} | {tx_type:>15} | {tx.created_at}")
+print(f"\n{'='*60}")
+print(f"Total: ${sum(t.amount_usd for t in txs)}")
+print(f"Wallet income_usd: ${wallet.income_usd}\n")
+exit()
+
+
+================================================================================
+ENABLE DAILY AUTOMATION (Important!)
+================================================================================
+
+In Render Dashboard → Environment Variables → Add:
+
+ENABLE_SCHEDULER=True
+
+This will automatically generate passive income every day.
+
+
+================================================================================
+WHAT EACH COMMAND DOES
+================================================================================
+
+comprehensive_passive_check:
+- Shows all users
+- Identifies issues
+- Explains what's wrong
+
+fix_all_passive_income:
+- Backfills missing passive income
+- Recalculates wallet balances
+- Fixes all issues
+- Shows detailed report
+
+run_daily_earnings:
+- Generates today's passive income
+- Should run automatically daily
+
+
+================================================================================
+EXPECTED RESULTS AFTER FIX
+================================================================================
+
+✅ Users WITH deposits:
+   - Have passive earning records
+   - income_usd matches passive income
+   - Everything balanced
+
+✅ Users WITHOUT deposits:
+   - No passive earning records
+   - income_usd = $0.00 (or only referral/milestone bonuses)
+   - No passive income
+
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+If you see "User has income but no deposit":
+1. Check if it's referral/milestone income (VALID)
+2. Check if it's passive income (BUG - needs fix)
+3. Run the investigation script above
+
+If you see "Missing passive earnings":
+1. Run: python manage.py run_daily_earnings --backfill-from-date 2025-10-01
+
+If you see "Amount mismatch":
+1. Run: python manage.py fix_all_passive_income
+
+
+================================================================================
+QUICK REFERENCE
+================================================================================
+
+Check status:
+python manage.py comprehensive_passive_check
+
+Fix everything:
+python manage.py fix_all_passive_income
+
+Generate today's earnings:
+python manage.py run_daily_earnings
+
+Backfill from date:
+python manage.py run_daily_earnings --backfill-from-date 2025-10-01
+
+Test mode (no changes):
+python manage.py run_daily_earnings --dry-run
+
+
+================================================================================
+🎯 BOTTOM LINE
+================================================================================
+
+Just run these 2 commands:
+
+1. python manage.py fix_all_passive_income
+2. Set ENABLE_SCHEDULER=True in Render environment
+
+Done! Everything will work automatically from now on. 🚀
+
+
+================================================================================

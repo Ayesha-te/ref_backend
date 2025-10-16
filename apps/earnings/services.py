@@ -8,8 +8,6 @@ WITHDRAW_TAX = Decimal(str(ECON['WITHDRAW_TAX']))
 GLOBAL_POOL_CUT = Decimal(str(ECON['GLOBAL_POOL_CUT']))
 REFERRAL_TIERS = [Decimal(str(x)) for x in ECON['REFERRAL_TIERS']]
 
-PACKAGE_USD = Decimal('100.00')  # base example package
-
 
 def _schedule():
     mode = ECON.get('PASSIVE_MODE', 'UNCHANGED')
@@ -32,13 +30,28 @@ def daily_percent_for_day(day_index: int) -> Decimal:
     return Decimal('0')
 
 
-def compute_daily_earning_usd(day_index: int) -> dict:
+def compute_daily_earning_usd(day_index: int, deposit_usd: Decimal) -> dict:
+    """
+    Calculate daily passive earnings based on user's ACTUAL deposit amount.
+    
+    Args:
+        day_index: Which day of the 90-day earning period (1-90)
+        deposit_usd: User's actual credited deposit amount in USD
+    
+    Returns:
+        dict with percent, gross, user share, platform hold, and global pool amounts
+    """
     p = daily_percent_for_day(day_index)
-    gross = PACKAGE_USD * p
+    deposit_amount = Decimal(str(deposit_usd))
+    
+    # Calculate gross earning for this day based on ACTUAL deposit
+    gross = deposit_amount * p
+    
     user_gross_share = gross * USER_SHARE
     # Platform hold is 20% of gross (1 - USER_SHARE); global pool is tracked separately
     global_pool = gross * GLOBAL_POOL_CUT
     platform_hold = gross * (Decimal('1') - USER_SHARE)
+    
     return {
         'percent': p,
         'gross_usd': gross.quantize(Decimal('0.01')),

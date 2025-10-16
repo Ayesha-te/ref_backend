@@ -118,7 +118,7 @@ class Command(BaseCommand):
                     self.stdout.write(self.style.WARNING(f"⏸️  {u.username}: Cannot generate day {current_day} (only {max_allowed_day} days have passed)"))
                     break
 
-                metrics = compute_daily_earning_usd(current_day)
+                metrics = compute_daily_earning_usd(current_day, first_dep.amount_usd)
 
                 if dry_run:
                     self.stdout.write(f"  [DRY RUN] Would credit {u.username} day {current_day}: {metrics['user_share_usd']} USD ({metrics['percent']}%)")

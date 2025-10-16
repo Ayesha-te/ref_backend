@@ -44,14 +44,22 @@ exit()
 
 
 ================================================================================
-ENABLE DAILY AUTOMATION (Important!)
+DAILY AUTOMATION STATUS ✅
 ================================================================================
 
-In Render Dashboard → Environment Variables → Add:
+Your system uses MIDDLEWARE for automatic daily earnings:
+- ✅ Already enabled in your settings
+- ✅ Runs automatically on first request each day
+- ✅ No manual setup needed!
 
-ENABLE_SCHEDULER=True
+How it works:
+1. First request of the day arrives
+2. Middleware checks if earnings processed today
+3. If not, generates earnings for all users
+4. Marks today as processed
+5. Request continues normally
 
-This will automatically generate passive income every day.
+NO ADDITIONAL SETUP REQUIRED!
 
 
 ================================================================================
@@ -129,12 +137,13 @@ python manage.py run_daily_earnings --dry-run
 🎯 BOTTOM LINE
 ================================================================================
 
-Just run these 2 commands:
+Just run this ONE command:
 
-1. python manage.py fix_all_passive_income
-2. Set ENABLE_SCHEDULER=True in Render environment
+python manage.py fix_all_passive_income
 
 Done! Everything will work automatically from now on. 🚀
+
+(Automation is already enabled via middleware - no additional setup needed!)
 
 
 ================================================================================

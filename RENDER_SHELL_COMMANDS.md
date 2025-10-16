@@ -184,7 +184,13 @@ python manage.py fix_all_passive_income
 
 ## 🔄 Daily Automation Setup
 
-### Check if Scheduler is Enabled
+### Check Automation Status
+Your system uses **middleware-based automation**:
+- ✅ Already enabled in settings
+- ✅ Runs automatically on first request each day
+- ✅ No manual setup needed
+
+To verify middleware is active:
 ```bash
 python manage.py shell
 ```
@@ -192,17 +198,19 @@ python manage.py shell
 Then:
 ```python
 from django.conf import settings
-print(f"ENABLE_SCHEDULER: {settings.ENABLE_SCHEDULER}")
+print("Middleware list:")
+for mw in settings.MIDDLEWARE:
+    if 'AutoDailyEarnings' in mw:
+        print(f"✅ {mw} - ACTIVE")
 exit()
 ```
 
-### Enable Scheduler (if needed)
-Add to Render environment variables:
-```
-ENABLE_SCHEDULER=True
-```
-
-This will automatically run `run_daily_earnings` every day at midnight.
+**How it works:**
+1. First HTTP request of the day arrives
+2. Middleware checks if earnings processed today
+3. If not, generates earnings for all users
+4. Marks today as processed
+5. Request continues normally
 
 ---
 
@@ -235,13 +243,20 @@ python manage.py comprehensive_passive_check
 - No issues flagged
 - All balances match
 
-### Step 4: Enable Daily Automation
-Set environment variable:
+### Step 4: Verify Automation is Working
+Your system uses middleware for automation - already enabled!
+
+Check middleware status:
+```bash
+python manage.py shell
 ```
-ENABLE_SCHEDULER=True
+```python
+from django.conf import settings
+print("✅ Middleware automation active" if any('AutoDailyEarnings' in mw for mw in settings.MIDDLEWARE) else "❌ Middleware not found")
+exit()
 ```
 
-### Step 5: Test Daily Run
+### Step 5: Test Daily Run (Optional)
 ```bash
 python manage.py run_daily_earnings
 ```

@@ -144,12 +144,13 @@ class Command(BaseCommand):
             if expected_days >= 1:
                 self.stdout.write(f"\n🧮 EXPECTED PASSIVE INCOME CALCULATION:")
                 self.stdout.write(f"   Days to calculate: {expected_days}")
+                self.stdout.write(f"   Using actual deposit: ${first_deposit.amount_usd}")
                 
                 for day in range(1, expected_days + 1):
-                    metrics = compute_daily_earning_usd(day)
+                    metrics = compute_daily_earning_usd(day, first_deposit.amount_usd)
                     expected_total += metrics['user_share_usd']
                     if day <= 5 or day == expected_days:  # Show first 5 and last day
-                        self.stdout.write(f"   • Day {day}: {metrics['percent']}% × ${PACKAGE_USD} × {USER_SHARE} = ${metrics['user_share_usd']}")
+                        self.stdout.write(f"   • Day {day}: {metrics['percent']}% × ${first_deposit.amount_usd} × {USER_SHARE} = ${metrics['user_share_usd']}")
                     elif day == 6:
                         self.stdout.write(f"   • ... (days 6-{expected_days-1})")
                 

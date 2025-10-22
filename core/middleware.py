@@ -159,7 +159,7 @@ class AutoDailyEarningsMiddleware:
                         continue
                     
                     # Compute and credit earnings
-                    metrics = compute_daily_earning_usd(current_day)
+                    metrics = compute_daily_earning_usd(current_day, first_dep.amount_usd)
                     
                     PassiveEarning.objects.create(
                         user=u,

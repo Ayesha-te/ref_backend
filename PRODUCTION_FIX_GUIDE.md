@@ -75,14 +75,14 @@ After deployment, run these commands to generate initial earnings:
 
 ```powershell
 # Get admin token
-$response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+$response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
 $token = $response.access
 
 # Generate 10 days of earnings
 Write-Host "Generating 10 days of earnings..."
 for ($day = 1; $day -le 10; $day++) {
     try {
-        $result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+        $result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
         Write-Host "✅ Day $day generated successfully"
         Start-Sleep -Seconds 2  # Small delay between calls
     } catch {
@@ -92,7 +92,7 @@ for ($day = 1; $day -le 10; $day++) {
 
 # Check results
 Write-Host "`nChecking results..."
-$users = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
+$users = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/accounts/admin/users/" -Method GET -Headers @{"Authorization"="Bearer $token"}
 $ahmad = $users | Where-Object { $_.username -eq "Ahmad" }
 Write-Host "Ahmad's passive income: $" $ahmad.passive_income_usd
 ```
@@ -108,7 +108,7 @@ Write-Host "Ahmad's passive income: $" $ahmad.passive_income_usd
 
 ### Option B: External Cron Service
 Use **cron-job.org** or **UptimeRobot**:
-- **URL**: `https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/`
+- **URL**: `https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/`
 - **Method**: POST
 - **Headers**: `Authorization: Bearer YOUR_ADMIN_TOKEN`
 - **Schedule**: Daily
@@ -126,13 +126,13 @@ After completing these steps:
 
 ```powershell
 # Test the admin panel
-# Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com
+# Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com
 # Ahmad should show passive income > $0.00
 
 # Test manual generation
-$response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+$response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
 $token = $response.access
-$result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+$result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
 Write-Host "Test result:" $result.message
 ```
 

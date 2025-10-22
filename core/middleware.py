@@ -2,6 +2,7 @@
 Middleware to handle Neon database connection issues and auto-trigger daily earnings
 """
 from django.db import OperationalError, transaction
+from django.db.models import Sum
 from django.utils import timezone
 from time import sleep
 import logging
@@ -104,12 +105,11 @@ class AutoDailyEarningsMiddleware:
                 total_amount_usd = Decimal('0.00')
                 
                 for u in users:
-                    # Only start passive earnings after first credited deposit (exclude signup initial)
+                    # Start passive earnings from signup fee (SIGNUP-INIT) or any credited deposit
+                    # Get the first credited deposit (including signup fee) for passive income calculation
                     first_dep = DepositRequest.objects.filter(
                         user=u, 
                         status='CREDITED'
-                    ).exclude(
-                        tx_id='SIGNUP-INIT'
                     ).order_by('processed_at', 'created_at').first()
                     
                     if not first_dep:
@@ -158,8 +158,18 @@ class AutoDailyEarningsMiddleware:
                     if current_day > max_allowed_day:
                         continue
                     
-                    # Compute and credit earnings
-                    metrics = compute_daily_earning_usd(current_day, first_dep.amount_usd)
+                    # ===== NEW: Calculate total accumulated deposits for passive income =====
+                    # Include all credited deposits (signup fee + any additional deposits)
+                    total_deposits = DepositRequest.objects.filter(
+                        user=u,
+                        status='CREDITED'
+                    ).aggregate(total=Sum('amount_usd'))['total'] or Decimal('0')
+                    
+                    if total_deposits <= 0:
+                        continue
+                    
+                    # Compute and credit earnings based on total accumulated deposits
+                    metrics = compute_daily_earning_usd(current_day, total_deposits)
                     
                     PassiveEarning.objects.create(
                         user=u,

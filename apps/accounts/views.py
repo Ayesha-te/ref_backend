@@ -159,6 +159,9 @@ def admin_pending_signup_proofs(request):
 @api_view(['POST'])
 @permission_classes([permissions.IsAdminUser])
 def admin_signup_proof_action(request, pk):
+    from decimal import Decimal
+    from django.conf import settings
+    
     try:
         sp = SignupProof.objects.get(pk=pk)
     except SignupProof.DoesNotExist:
@@ -171,6 +174,68 @@ def admin_signup_proof_action(request, pk):
         sp.user.is_active = True
         sp.user.save()
         sp.save()
+        
+        # ===== NEW: Create deposit for signup fee to start passive income =====
+        # Convert signup amount to USD using FX rate
+        fx_rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
+        amount_usd = (sp.amount_pkr / fx_rate).quantize(Decimal('0.01'))
+        
+        # Check if signup deposit already exists for this user
+        existing_signup_deposit = DepositRequest.objects.filter(
+            user=sp.user,
+            tx_id='SIGNUP-INIT'
+        ).first()
+        
+        if not existing_signup_deposit:
+            # Create and credit the signup fee deposit
+            deposit = DepositRequest.objects.create(
+                user=sp.user,
+                amount_pkr=sp.amount_pkr,
+                amount_usd=amount_usd,
+                fx_rate=fx_rate,
+                tx_id='SIGNUP-INIT',
+                proof_image=sp.proof_image,  # Link to signup proof
+                status='CREDITED',
+                processed_at=timezone.now()
+            )
+            
+            # Credit to wallet and record transaction
+            from apps.wallets.models import Wallet, Transaction
+            from apps.earnings.models_global_pool import GlobalPool
+            
+            wallet, _ = Wallet.objects.get_or_create(user=sp.user)
+            user_share_rate = Decimal(str(settings.ECONOMICS['USER_WALLET_SHARE']))
+            global_pool_rate = Decimal(str(settings.ECONOMICS['GLOBAL_POOL_CUT']))
+            
+            user_share = (amount_usd * user_share_rate).quantize(Decimal('0.01'))
+            platform_hold = (amount_usd - user_share).quantize(Decimal('0.01'))
+            global_pool = (amount_usd * global_pool_rate).quantize(Decimal('0.01'))
+            
+            wallet.available_usd = (Decimal(wallet.available_usd) + user_share).quantize(Decimal('0.01'))
+            wallet.hold_usd = (Decimal(wallet.hold_usd) + platform_hold).quantize(Decimal('0.01'))
+            wallet.save()
+            
+            # Track global pool balance
+            gp = GlobalPool.objects.first() or GlobalPool.objects.create()
+            gp.balance_usd = (Decimal(gp.balance_usd) + global_pool).quantize(Decimal('0.01'))
+            gp.save()
+            
+            # Record full deposit in transactions with breakdown
+            Transaction.objects.create(
+                wallet=wallet,
+                type=Transaction.CREDIT,
+                amount_usd=amount_usd,
+                meta={
+                    'type': 'deposit',
+                    'source': 'signup-initial',
+                    'id': deposit.id,
+                    'tx_id': 'SIGNUP-INIT',
+                    'user_share_usd': str(user_share),
+                    'platform_hold_usd': str(platform_hold),
+                    'global_pool_usd': str(global_pool),
+                }
+            )
+        
     elif action == 'REJECT':
         sp.status = 'REJECTED'
         sp.processed_at = timezone.now()

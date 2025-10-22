@@ -70,12 +70,12 @@ $token = $response.access
 
 ### Step 2: Generate Daily Earnings
 ```powershell
-$result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+$result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
 $result | ConvertTo-Json -Depth 3
 ```
 
 ### Step 3: Verify in Admin Panel
-Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com
+Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com
 
 ## Security Notes
 - Only admin users can access this endpoint

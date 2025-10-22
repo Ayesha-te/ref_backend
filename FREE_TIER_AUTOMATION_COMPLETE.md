@@ -55,7 +55,7 @@ $token = $response.access
 Write-Host "Generating initial earnings data..."
 for ($day = 1; $day -le 10; $day++) {
     try {
-        $result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+        $result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
         Write-Host "✅ Day $day generated"
         Start-Sleep -Seconds 2
     } catch {
@@ -64,17 +64,17 @@ for ($day = 1; $day -le 10; $day++) {
 }
 
 # Check admin panel
-Write-Host "✅ Check admin panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com"
+Write-Host "✅ Check admin panel: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com"
 ```
 
 ### **Step 4: Monitor System Health**
 ```powershell
 # Check scheduler status
-$status = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/scheduler-status/" -Method GET -Headers @{"Authorization"="Bearer $token"}
+$status = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/scheduler-status/" -Method GET -Headers @{"Authorization"="Bearer $token"}
 $status | ConvertTo-Json
 
 # Manual trigger if needed
-$trigger = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/trigger-now/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+$trigger = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/trigger-now/" -Method POST -Headers @{"Authorization"="Bearer $token"}
 $trigger.message
 ```
 

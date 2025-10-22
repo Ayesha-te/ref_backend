@@ -79,51 +79,8 @@ def on_user_approved(sender, instance: User, created, **kwargs):
                         }
                     )
 
-        # 3) Initial signup deposit credit -> PKR to USD by admin rate
-        # IMPORTANT: Only create initial deposit once (prevent duplicates)
-        already_deposited = DepositRequest.objects.filter(
-            user=instance,
-            tx_id='SIGNUP-INIT'
-        ).exists()
-        
-        if not already_deposited:
-            try:
-                # Get actual signup amount from SignupProof
-                signup_proof = SignupProof.objects.filter(user=instance).order_by('-created_at').first()
-                if signup_proof:
-                    amount_pkr = Decimal(str(signup_proof.amount_pkr))
-                else:
-                    amount_pkr = Decimal(str(settings.SIGNUP_FEE_PKR))
-                
-                rate = Decimal(str(settings.ADMIN_USD_TO_PKR))
-                amount_usd = (amount_pkr / rate).quantize(Decimal('0.01'))
-
-                wallet, _ = Wallet.objects.get_or_create(user=instance)
-
-                # Record transaction only (do not credit to available balance)
-                Transaction.objects.create(
-                    wallet=wallet,
-                    type=Transaction.CREDIT,
-                    amount_usd=amount_usd,
-                    meta={
-                        'type': 'deposit',
-                        'source': 'signup-initial',
-                        'tx_id': 'SIGNUP-INIT',
-                        'amount_pkr': str(amount_pkr),
-                        'non_income': True,
-                    }
-                )
-
-                # Record deposit for traceability without affecting balance
-                DepositRequest.objects.create(
-                    user=instance,
-                    amount_pkr=amount_pkr,
-                    amount_usd=amount_usd,
-                    fx_rate=rate,
-                    tx_id='SIGNUP-INIT',
-                    status='CREDITED',
-                    processed_at=timezone.now(),
-                )
-            except Exception:
-                # Fail silently to avoid breaking approval; admin can adjust manually
-                pass
+        # 3) Initial signup deposit credit is now handled in admin_signup_proof_action view
+        # The view properly credits the deposit to the wallet and generates passive income
+        # This signal handler no longer handles deposit creation to avoid duplicates
+        # NOTE: Deposit creation logic moved to apps.accounts.views.admin_signup_proof_action
+        pass

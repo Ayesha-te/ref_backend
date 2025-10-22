@@ -39,11 +39,11 @@
 ### Test the API Endpoint:
 ```powershell
 # Get admin token
-$response = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
+$response = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/auth/token/" -Method POST -Headers @{"Content-Type"="application/json"} -Body '{"username":"Ahmad","password":"12345"}'
 $token = $response.access
 
 # Test earnings generation
-$result = Invoke-RestMethod -Uri "https://ref-backend-8arb.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
+$result = Invoke-RestMethod -Uri "https://ref-backend-fw8y.onrender.com/api/earnings/generate-daily/" -Method POST -Headers @{"Authorization"="Bearer $token"}
 $result | ConvertTo-Json
 ```
 
@@ -76,7 +76,7 @@ After deployment and running the earnings generation:
 ## 🔍 MONITORING & VERIFICATION
 
 ### Check Admin Panel:
-Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-8arb.onrender.com
+Visit: https://adminui-etbh.vercel.app/?api_base=https://ref-backend-fw8y.onrender.com
 
 ### Check Render Logs:
 Look for these success messages:
